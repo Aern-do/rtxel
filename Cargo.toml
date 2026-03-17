@@ -1,0 +1,12 @@
+[workspace]
+members = ["libs/*"]
+resolver = "3"
+
+[workspace.dependencies]
+rtxel-core = { path = "libs/rtxel-core" }
+rtxel-game = { path = "libs/rtxel-game" }
+rtxel-render = { path = "libs/rtxel-render" }
+rtxel-gpu = { path = "libs/rtxel-gpu" }
+rtxel-slang = { path = "libs/rtxel-slang" }
+bevy_ecs = { version = "0.18.1", features = ["debug"] }
+glam = { version = "0.32.1", features = ["encase"] }

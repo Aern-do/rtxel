@@ -1,0 +1,8 @@
+[package]
+name = "rtxel-gpu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy_ecs = { workspace = true }
+wgpu = "28.0.0"

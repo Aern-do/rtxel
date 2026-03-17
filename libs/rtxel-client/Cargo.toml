@@ -1,0 +1,9 @@
+[package]
+name = "rtxel-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rtxel-core = { workspace = true }
+rtxel-render = { workspace = true }
+rtxel-game = { workspace = true }

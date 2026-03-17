@@ -1,0 +1,17 @@
+[package]
+name = "rtxel-render"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rtxel-core = { workspace = true }
+rtxel-game = { workspace = true }
+rtxel-gpu = { workspace = true }
+bevy_ecs = { workspace = true }
+glam = { workspace = true }
+encase = "0.12.0"
+pollster = "0.4.0"
+wgpu = "28.0.0"
+
+[build-dependencies]
+rtxel-slang = { workspace = true }
