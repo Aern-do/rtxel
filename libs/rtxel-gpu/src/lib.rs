@@ -1,21 +1,25 @@
+use std::{borrow::Cow, sync::Mutex};
+
+use bevy_ecs::resource::Resource;
+use wgpu::{
+    Backends, BindGroupLayout, Buffer, BufferUsages, Device, Extent3d, Instance,
+    InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, PowerPreference, PresentMode,
+    Queue, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface,
+    SurfaceConfiguration, SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages,
+    wgt::{BufferDescriptor, DeviceDescriptor, TextureDescriptor},
+};
+
 pub mod bind_group;
+pub mod binding;
 pub mod compute_pipeline;
+pub mod dynamic_buffer;
 pub mod render_pipeline;
 
 pub use bind_group::*;
+pub use binding::*;
 pub use compute_pipeline::*;
+pub use dynamic_buffer::*;
 pub use render_pipeline::*;
-
-use bevy_ecs::resource::Resource;
-use std::{borrow::Cow, sync::Mutex};
-use wgpu::{
-    Backends, BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, Buffer,
-    BufferUsages, Device, Extent3d, Instance, InstanceDescriptor, PipelineLayout,
-    PipelineLayoutDescriptor, PowerPreference, PresentMode, Queue, RequestAdapterOptions,
-    ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface, SurfaceConfiguration,
-    SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages,
-    wgt::{BufferDescriptor, DeviceDescriptor, TextureDescriptor},
-};
 
 #[derive(Debug, Resource)]
 pub struct Ctx {
@@ -65,28 +69,16 @@ impl Ctx {
         }
     }
 
+    pub fn size(&self) -> (u32, u32) {
+        let config = self.config.lock().expect("failed to lock config");
+        (config.width, config.height)
+    }
+
     pub fn wgsl_shader(&self, label: Option<&str>, source: &str) -> ShaderModule {
         self.device.create_shader_module(ShaderModuleDescriptor {
             label,
             source: ShaderSource::Wgsl(Cow::Borrowed(source)),
         })
-    }
-
-    pub fn bind_group_layout(
-        &self,
-        label: Option<&str>,
-        entries: &[BindGroupLayoutEntry],
-    ) -> BindGroupLayout {
-        create_bind_group_layout(self, label, entries)
-    }
-
-    pub fn bind_group(
-        &self,
-        label: Option<&str>,
-        layout: &BindGroupLayout,
-        entries: &[BindGroupEntry],
-    ) -> BindGroup {
-        create_bind_group(self, label, layout, entries)
     }
 
     pub fn pipeline_layout(

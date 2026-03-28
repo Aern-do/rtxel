@@ -1,7 +1,7 @@
 use wgpu::{
-    Color, ColorTargetState, ColorWrites, FragmentState, MultisampleState,
-    PipelineCompilationOptions, PipelineLayout, PrimitiveState, PrimitiveTopology, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, TextureFormat, VertexState,
+    ColorTargetState, ColorWrites, FragmentState, MultisampleState, PipelineCompilationOptions,
+    PipelineLayout, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModule, TextureFormat, VertexState,
 };
 
 use crate::Ctx;
@@ -46,7 +46,8 @@ impl<'ctx, 'pl> RenderPipelineBuilder<'ctx, 'pl> {
     }
 
     pub fn build(self) -> RenderPipeline {
-        self.ctx.device
+        self.ctx
+            .device
             .create_render_pipeline(&RenderPipelineDescriptor {
                 label: self.label,
                 layout: Some(self.base.layout),

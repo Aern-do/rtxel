@@ -1,18 +1,24 @@
+use std::time::Instant;
+
 use bevy_ecs::world::{Mut, World};
 use winit::{
     application::ApplicationHandler,
-    event::{DeviceEvent, DeviceId, WindowEvent},
+    event::{DeviceEvent, DeviceId, ElementState, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::PhysicalKey,
     window::{Window, WindowAttributes, WindowId},
 };
 
-use crate::{CorePlugin, MouseMotion, Order, Startup, WindowHandle, world_ext::WorldExt};
+use crate::{
+    CorePlugin, DeltaTime, KeyPress, MouseMotion, Order, Startup, WindowHandle, world_ext::WorldExt,
+};
 
 #[derive(Debug)]
 struct Init<F> {
     attach: F,
     attrs: WindowAttributes,
     world: Option<World>,
+    last_frame: Option<Instant>,
 }
 
 impl<F> Init<F> {
@@ -21,6 +27,7 @@ impl<F> Init<F> {
             attach,
             attrs,
             world: None,
+            last_frame: None,
         }
     }
 }
@@ -54,6 +61,12 @@ impl<F: Fn(&mut World, Window)> ApplicationHandler for Init<F> {
 
         match event {
             WindowEvent::RedrawRequested => {
+                let now = Instant::now();
+                if let Some(last) = self.last_frame {
+                    let dt = now.duration_since(last).as_secs_f32();
+                    world.resource_mut::<DeltaTime>().seconds = dt;
+                }
+                self.last_frame = Some(now);
                 world.resource_scope(|world, order: Mut<Order>| {
                     for &schedule in &order.schedules {
                         world.run_schedule(schedule);
@@ -61,6 +74,14 @@ impl<F: Fn(&mut World, Window)> ApplicationHandler for Init<F> {
                 });
 
                 world.resource::<WindowHandle>().handle.request_redraw();
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if let PhysicalKey::Code(key_code) = event.physical_key {
+                    world.trigger(KeyPress {
+                        key: key_code,
+                        release: event.state == ElementState::Released,
+                    })
+                }
             }
             _ => {}
         }
@@ -76,11 +97,11 @@ impl<F: Fn(&mut World, Window)> ApplicationHandler for Init<F> {
             return;
         };
 
-        match event {
-            DeviceEvent::MouseMotion {
-                delta: (delta_x, delta_y),
-            } => world.trigger(MouseMotion { delta_x, delta_y }),
-            _ => {}
+        if let DeviceEvent::MouseMotion {
+            delta: (delta_x, delta_y),
+        } = event
+        {
+            world.trigger(MouseMotion { delta_x, delta_y })
         }
     }
 }

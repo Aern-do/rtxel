@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 rtxel-core = { workspace = true }
-rtxel-render = { workspace = true }
 rtxel-game = { workspace = true }
+env_logger = "0.11.10"

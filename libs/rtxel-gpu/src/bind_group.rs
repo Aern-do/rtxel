@@ -1,136 +1,137 @@
+use std::marker::PhantomData;
+
+use paste::paste;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry,
+    BindGroupLayoutEntry, BindingResource, BindingType, ShaderStages,
 };
 
 use crate::Ctx;
 
-pub mod layout {
-    use std::num::NonZeroU64;
+pub trait Bindable {
+    type Resource: 'static;
 
-    use wgpu::{
-        BindGroupLayoutEntry, BindingType, BufferBindingType, SamplerBindingType, ShaderStages,
-        StorageTextureAccess, Texture, TextureSampleType, TextureViewDimension,
-    };
+    fn binding_type() -> BindingType;
+    fn binding_resource(resource: &Self::Resource) -> BindingResource<'_>;
+}
 
-    pub fn texture(sample_type: TextureSampleType) -> BindingType {
-        BindingType::Texture {
-            sample_type,
-            view_dimension: TextureViewDimension::D2,
-            multisampled: false,
-        }
-    }
+pub trait Visibility {
+    fn visibility() -> ShaderStages;
+}
 
-    pub fn texture_float() -> BindingType {
-        texture(TextureSampleType::Float { filterable: true })
-    }
+pub struct Compute;
 
-    pub fn sampler_filtering() -> BindingType {
-        BindingType::Sampler(SamplerBindingType::Filtering)
-    }
-
-    pub fn uniform_buffer(min_binding_size: Option<NonZeroU64>) -> BindingType {
-        BindingType::Buffer {
-            ty: BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size,
-        }
-    }
-
-    pub fn storage_buffer(read_only: bool, min_binding_size: Option<NonZeroU64>) -> BindingType {
-        BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only },
-            has_dynamic_offset: false,
-            min_binding_size,
-        }
-    }
-
-    pub fn storage_texture(texture: &Texture, access: StorageTextureAccess) -> BindingType {
-        BindingType::StorageTexture {
-            access,
-            format: texture.format(),
-            view_dimension: TextureViewDimension::D2,
-        }
-    }
-
-    pub fn r_storage_texture(texture: &Texture) -> BindingType {
-        storage_texture(texture, StorageTextureAccess::ReadOnly)
-    }
-
-    pub fn w_storage_texture(texture: &Texture) -> BindingType {
-        storage_texture(texture, StorageTextureAccess::WriteOnly)
-    }
-
-    pub fn rw_storage_texture(texture: &Texture) -> BindingType {
-        storage_texture(texture, StorageTextureAccess::ReadWrite)
-    }
-
-    pub fn entry(binding: u32, ty: BindingType, visibility: ShaderStages) -> BindGroupLayoutEntry {
-        BindGroupLayoutEntry {
-            binding,
-            visibility,
-            ty,
-            count: None,
-        }
-    }
-
-    pub fn compute(binding: u32, ty: BindingType) -> BindGroupLayoutEntry {
-        entry(binding, ty, ShaderStages::COMPUTE)
-    }
-
-    pub fn vertex(binding: u32, ty: BindingType) -> BindGroupLayoutEntry {
-        entry(binding, ty, ShaderStages::VERTEX)
-    }
-
-    pub fn fragment(binding: u32, ty: BindingType) -> BindGroupLayoutEntry {
-        entry(binding, ty, ShaderStages::FRAGMENT)
-    }
-
-    pub fn vertex_fragment(binding: u32, ty: BindingType) -> BindGroupLayoutEntry {
-        entry(binding, ty, ShaderStages::VERTEX_FRAGMENT)
+impl Visibility for Compute {
+    fn visibility() -> ShaderStages {
+        ShaderStages::COMPUTE
     }
 }
 
-// kinda useless
-// just to match format of layout
-pub mod binding {
-    use wgpu::{BindGroupEntry, BindingResource, Buffer, Sampler, TextureView};
+pub struct Binding<const IDX: usize, V, B>(PhantomData<(V, B)>);
 
-    pub fn view(view: &TextureView) -> BindingResource<'_> {
-        BindingResource::TextureView(view)
+pub trait AsBindGroup {
+    type Resources<'res>;
+
+    fn layout(ctx: &Ctx) -> BindGroupLayout;
+
+    fn bind_group<'res>(
+        ctx: &Ctx,
+        layout: &BindGroupLayout,
+        resources: Self::Resources<'res>,
+    ) -> BindGroup;
+}
+
+impl<const IDX: usize, V: Visibility, B: Bindable> AsBindGroup for Binding<IDX, V, B> {
+    type Resources<'res> = &'res B::Resource;
+
+    fn layout(ctx: &Ctx) -> BindGroupLayout {
+        ctx.device
+            .create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[BindGroupLayoutEntry {
+                    binding: IDX as u32,
+                    visibility: V::visibility(),
+                    ty: B::binding_type(),
+                    count: None,
+                }],
+            })
     }
 
-    pub fn sampler(sampler: &Sampler) -> BindingResource<'_> {
-        BindingResource::Sampler(sampler)
-    }
-
-    pub fn buffer(buffer: &Buffer) -> BindingResource<'_> {
-        buffer.as_entire_binding()
-    }
-
-    pub fn entry(binding: u32, resource: BindingResource) -> BindGroupEntry {
-        BindGroupEntry { binding, resource }
+    fn bind_group<'res>(
+        ctx: &Ctx,
+        layout: &BindGroupLayout,
+        resources: Self::Resources<'res>,
+    ) -> BindGroup {
+        ctx.device.create_bind_group(&BindGroupDescriptor {
+            label: None,
+            layout,
+            entries: &[BindGroupEntry {
+                binding: IDX as u32,
+                resource: B::binding_resource(resources),
+            }],
+        })
     }
 }
 
-pub fn create_bind_group_layout(
-    ctx: &Ctx,
-    label: Option<&str>,
-    entries: &[BindGroupLayoutEntry],
-) -> BindGroupLayout {
-    ctx.device
-        .create_bind_group_layout(&BindGroupLayoutDescriptor { label, entries })
+macro_rules! impl_as_bind_group {
+    ($($($generic:ident)*);*) => {paste!{$(
+        #[allow(non_snake_case)]
+        impl<
+            $(
+                const [<IDX $generic>]: usize,
+                [<V $generic>]: Visibility,
+                [<B $generic>]: Bindable,
+            )*
+        > AsBindGroup for (
+            $(Binding<[<IDX $generic>], [<V $generic>], [<B $generic>]>,)*
+        ) {
+            type Resources<'res> = (
+                $(&'res [<B $generic>]::Resource,)*
+            );
+
+            fn layout(ctx: &Ctx) -> BindGroupLayout {
+                ctx.device.
+                    create_bind_group_layout(&BindGroupLayoutDescriptor {
+                        label: None,
+                        entries: &[
+                            $(BindGroupLayoutEntry {
+                                binding: [<IDX $generic>] as u32,
+                                visibility: [<V $generic>]::visibility(),
+                                ty: [<B $generic>]::binding_type(),
+                                count: None,
+                            },)*]
+                        })
+            }
+
+            fn bind_group<'res>(
+                ctx: &Ctx,
+                layout: &BindGroupLayout,
+                resources: Self::Resources<'res>,
+            ) -> BindGroup {
+                let ($([<r $generic>],)*) = resources;
+
+
+                ctx.device.create_bind_group(&BindGroupDescriptor {
+                    label: None,
+                    layout,
+                    entries: &[
+                        $(BindGroupEntry {
+                            binding: [<IDX $generic>] as u32,
+                            resource: [<B $generic>]::binding_resource(
+                                [<r $generic>],
+                            ),
+                        },)*
+                    ],
+                })
+            }
+        }
+    )*}};
 }
 
-pub fn create_bind_group(
-    ctx: &Ctx,
-    label: Option<&str>,
-    layout: &BindGroupLayout,
-    entries: &[BindGroupEntry],
-) -> BindGroup {
-    ctx.device.create_bind_group(&BindGroupDescriptor {
-        label,
-        layout,
-        entries,
-    })
+impl_as_bind_group! {
+    A;
+    A B;
+    A B C;
+    A B C D;
+    A B C D E;
 }

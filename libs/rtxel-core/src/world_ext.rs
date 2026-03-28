@@ -1,5 +1,5 @@
 use bevy_ecs::{
-    schedule::{IntoScheduleConfigs, ScheduleLabel, Schedules},
+    schedule::{InternedSystemSet, IntoScheduleConfigs, ScheduleLabel, Schedules},
     system::ScheduleSystem,
     world::World,
 };
@@ -12,7 +12,13 @@ pub trait WorldExt {
         &mut self,
         schedule: impl ScheduleLabel,
         systems: impl IntoScheduleConfigs<ScheduleSystem, M>,
-    );
+    ) -> &mut Self;
+
+    fn configure_sets<M>(
+        &mut self,
+        schedule: impl ScheduleLabel,
+        sets: impl IntoScheduleConfigs<InternedSystemSet, M>,
+    ) -> &mut Self;
 }
 
 impl WorldExt for World {
@@ -24,8 +30,20 @@ impl WorldExt for World {
         &mut self,
         schedule: impl ScheduleLabel,
         systems: impl IntoScheduleConfigs<ScheduleSystem, M>,
-    ) {
+    ) -> &mut Self {
         self.get_resource_or_init::<Schedules>()
             .add_systems(schedule, systems);
+
+        self
+    }
+
+    fn configure_sets<M>(
+        &mut self,
+        schedule: impl ScheduleLabel,
+        sets: impl IntoScheduleConfigs<InternedSystemSet, M>,
+    ) -> &mut Self {
+        let mut schedules = self.resource_mut::<Schedules>();
+        schedules.configure_sets(schedule, sets);
+        self
     }
 }

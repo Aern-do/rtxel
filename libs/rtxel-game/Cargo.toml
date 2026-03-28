@@ -5,5 +5,15 @@ edition = "2024"
 
 [dependencies]
 rtxel-core = { workspace = true }
+rtxel-gpu = { workspace = true }
 bevy_ecs = { workspace = true }
 glam = { workspace = true }
+wgpu = { workspace = true }
+log = { workspace = true }
+encase = "0.12.0"
+winit = "0.30.13"
+noise = "0.9.0"
+pollster = "0.4.0"
+
+[build-dependencies]
+rtxel-slang = { workspace = true }

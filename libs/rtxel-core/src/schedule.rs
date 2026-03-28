@@ -43,11 +43,7 @@ pub struct SchedulePlugin;
 
 impl Plugin for SchedulePlugin {
     fn init(self, world: &mut World) {
-        let schedules = [
-            PreUpdate.intern(),
-            Update.intern(),
-            PostUpdate.intern(),
-        ];
+        let schedules = [PreUpdate.intern(), Update.intern(), PostUpdate.intern()];
 
         for schedule in &schedules {
             world.add_schedule(Schedule::new(*schedule));

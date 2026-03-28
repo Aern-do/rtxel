@@ -6,7 +6,10 @@ use bevy_ecs::{
     world::World,
 };
 use glam::Vec3;
-use rtxel_core::{MouseMotion, Plugin, Startup, Update, WindowHandle, WorldExt};
+use rtxel_core::{
+    DeltaTime, KeyCode, Keyboard, MouseMotion, Plugin, Startup, Update, WindowHandle, WorldExt,
+};
+use winit::window::CursorGrabMode;
 
 use crate::Player;
 
@@ -20,6 +23,8 @@ pub struct Camera {
     pub up: Vec3,
     pub aspect: f32,
     pub fov: f32,
+
+    pub frame_count: u32,
 }
 
 impl Camera {
@@ -38,21 +43,34 @@ impl Camera {
         let right = self.forward.cross(world_up).normalize();
         self.up = right.cross(self.forward).normalize();
     }
+
+    pub fn vectors(&self) -> (Vec3, Vec3, Vec3) {
+        let right = self.forward.cross(Vec3::Y).normalize();
+        let up = right.cross(self.forward).normalize();
+        (self.forward, right, up)
+    }
 }
 
 const SENSITIVITY: f32 = 0.1;
+const MOVE_SENSITIVITY: f32 = 15.0;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn init(self, world: &mut World) {
         world.add_systems(Startup, setup_camera);
+        world.add_systems(Update, (increment_camera, move_camera));
         world.add_observer(mouse_look);
     }
 }
 
 fn setup_camera(window: Res<WindowHandle>, mut commands: Commands) {
     let size = window.handle.inner_size();
+    window
+        .handle
+        .set_cursor_grab(CursorGrabMode::Locked)
+        .expect("failed to grab cursor");
+    window.handle.set_cursor_visible(false);
 
     let mut camera = Camera {
         origin: Vec3::new(0., 1., -1.),
@@ -62,6 +80,7 @@ fn setup_camera(window: Res<WindowHandle>, mut commands: Commands) {
         fov: 65.0,
         yaw: 90.0,
         pitch: 0.0,
+        frame_count: 0,
     };
     camera.update_vectors();
 
@@ -69,21 +88,42 @@ fn setup_camera(window: Res<WindowHandle>, mut commands: Commands) {
 }
 
 fn mouse_look(motion: On<MouseMotion>, mut camera: Query<&mut Camera, With<Player>>) {
-    let mut total_x = 0.0;
-    let mut total_y = 0.0;
-
-    total_x += motion.delta_x as f32;
-    total_y += motion.delta_y as f32;
-
-    if total_x == 0.0 && total_y == 0.0 {
+    if motion.delta_x == 0.0 && motion.delta_y == 0.0 {
         return;
     }
 
     let mut cam = camera.single_mut().expect("expected camera");
 
-    cam.yaw += total_x * SENSITIVITY;
-    cam.pitch -= total_y * SENSITIVITY;
+    cam.yaw += motion.delta_x as f32 * SENSITIVITY;
+    cam.pitch -= motion.delta_y as f32 * SENSITIVITY;
     cam.pitch = cam.pitch.clamp(-89.0, 89.0);
 
     cam.update_vectors();
+}
+
+fn increment_camera(mut camera: Query<&mut Camera, With<Player>>) {
+    let mut camera = camera.single_mut().expect("expected camera");
+    camera.frame_count += 1;
+}
+
+fn move_camera(
+    keyboard: Res<Keyboard>,
+    delta: Res<DeltaTime>,
+    mut camera: Query<&mut Camera, With<Player>>,
+) {
+    let mut camera = camera.single_mut().expect("expected camera");
+    let (forward, right, _) = camera.vectors();
+
+    if keyboard.is_pressed(KeyCode::KeyW) {
+        camera.origin += forward * delta.seconds * MOVE_SENSITIVITY;
+    }
+    if keyboard.is_pressed(KeyCode::KeyS) {
+        camera.origin -= forward * delta.seconds * MOVE_SENSITIVITY;
+    }
+    if keyboard.is_pressed(KeyCode::KeyD) {
+        camera.origin += right * delta.seconds * MOVE_SENSITIVITY;
+    }
+    if keyboard.is_pressed(KeyCode::KeyA) {
+        camera.origin -= right * delta.seconds * MOVE_SENSITIVITY;
+    }
 }

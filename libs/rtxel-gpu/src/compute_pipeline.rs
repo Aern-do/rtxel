@@ -1,6 +1,6 @@
 use wgpu::{
-    ComputePipeline, ComputePipelineDescriptor, PipelineCompilationOptions,
-    PipelineLayout, ShaderModule,
+    ComputePipeline, ComputePipelineDescriptor, PipelineCompilationOptions, PipelineLayout,
+    ShaderModule,
 };
 
 use crate::Ctx;

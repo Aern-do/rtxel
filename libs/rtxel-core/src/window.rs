@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bevy_ecs::{event::Event, resource::Resource, world::World};
-use winit::window::Window;
+use winit::{keyboard::KeyCode, window::Window};
 
 use crate::Plugin;
 
@@ -19,6 +19,23 @@ pub struct MouseMotion {
     pub delta_y: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Event)]
+pub struct KeyPress {
+    pub key: KeyCode,
+    pub release: bool,
+}
+
+#[derive(Debug, Default, Resource, Clone, Copy)]
+pub struct DeltaTime {
+    pub seconds: f32,
+}
+
+impl DeltaTime {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 #[derive(Debug)]
 pub struct WindowPlugin {
     pub window: Window,
@@ -30,5 +47,6 @@ impl Plugin for WindowPlugin {
         world.insert_resource(WindowHandle {
             handle: Arc::new(self.window),
         });
+        world.insert_resource(DeltaTime::new());
     }
 }

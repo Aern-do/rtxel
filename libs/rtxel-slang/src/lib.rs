@@ -1,7 +1,7 @@
 use std::{
     env::{temp_dir, var},
     fs::{read_to_string, write},
-    io::{Error, ErrorKind, Result},
+    io::{Error, Result},
     path::Path,
     process::{Command, Output},
 };
@@ -25,10 +25,7 @@ pub fn compile_slang_to_string(path: &Path) -> Result<String> {
     ])?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::new(
-            ErrorKind::Other,
-            format!("slangc failed: {stderr}"),
-        ));
+        return Err(Error::other(format!("slangc failed: {stderr}")));
     }
 
     read_to_string(out_path)

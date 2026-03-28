@@ -1,15 +1,16 @@
+pub mod keyboard;
 pub mod schedule;
 pub mod start;
 pub mod window;
 pub mod world_ext;
 
+use bevy_ecs::world::World;
+pub use keyboard::*;
 pub use schedule::*;
 pub use start::*;
 pub use window::*;
-pub use world_ext::*;
-
-use bevy_ecs::world::World;
 use winit::window::Window;
+pub use world_ext::*;
 
 pub trait Plugin {
     fn init(self, world: &mut World);
@@ -25,5 +26,6 @@ impl Plugin for CorePlugin {
         world.add_plugin(WindowPlugin {
             window: self.window,
         });
+        world.add_plugin(KeyboardPlugin);
     }
 }
