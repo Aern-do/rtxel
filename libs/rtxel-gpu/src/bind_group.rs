@@ -27,6 +27,30 @@ impl Visibility for Compute {
     }
 }
 
+pub struct Vertex;
+
+impl Visibility for Vertex {
+    fn visibility() -> ShaderStages {
+        ShaderStages::VERTEX
+    }
+}
+
+pub struct Fragment;
+
+impl Visibility for Fragment {
+    fn visibility() -> ShaderStages {
+        ShaderStages::FRAGMENT
+    }
+}
+
+pub struct VertexFragment;
+
+impl Visibility for VertexFragment {
+    fn visibility() -> ShaderStages {
+        ShaderStages::VERTEX_FRAGMENT
+    }
+}
+
 pub struct Binding<const IDX: usize, V, B>(PhantomData<(V, B)>);
 
 pub trait AsBindGroup {

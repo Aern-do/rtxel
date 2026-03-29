@@ -1,6 +1,6 @@
 use bevy_ecs::{
     resource::Resource,
-    schedule::IntoScheduleConfigs,
+    schedule::{IntoScheduleConfigs, ScheduleLabel},
     system::{Commands, Res, ResMut},
     world::World,
 };
@@ -14,7 +14,7 @@ use rtxel_gpu::{
 use wgpu::{BindGroup, BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline};
 
 use crate::{
-    Frame, GpuBrickMap, GpuWorld, PipelineSet, Render, RenderSet, RenderStartupSet, UnpackCommand,
+    Frame, GpuBrickMap, GpuWorld, PipelineSet, RenderStartupSet, UnpackCommand,
     shared::SharedResources,
 };
 
@@ -31,7 +31,32 @@ type SharedBindGroup = (
 const UNPACK_SHADER: &str = include_str!(env!("SHADER_unpack"));
 const WORKGROUP_SIZE: u32 = 64;
 
-pub struct UnpackPipelinePlugin;
+pub struct UnpackPipelinePlugin<S> {
+    pub schedule: S,
+}
+
+impl<S: ScheduleLabel> Plugin for UnpackPipelinePlugin<S> {
+    fn init(self, world: &mut World) {
+        world
+            .add_systems(
+                Startup,
+                (init_resources, init_pipeline)
+                    .chain()
+                    .in_set(RenderStartupSet::Resources),
+            )
+            .add_systems(
+                self.schedule.intern(),
+                (
+                    extract,
+                    rebuild.run_if(|resources: Res<UnpackResources>| resources.is_dirty),
+                    rebuild_shared.run_if(|shared: Res<SharedResources>| shared.is_dirty),
+                )
+                    .chain()
+                    .in_set(PipelineSet::Extract),
+            )
+            .add_systems(self.schedule, dispatch.in_set(PipelineSet::Dispatch));
+    }
+}
 
 #[derive(Debug, Resource)]
 pub struct UnpackPipeline {
@@ -135,36 +160,6 @@ impl UnpackResources {
     }
 }
 
-impl Plugin for UnpackPipelinePlugin {
-    fn init(self, world: &mut World) {
-        world
-            .add_systems(
-                Startup,
-                (init_resources, init_pipeline)
-                    .chain()
-                    .in_set(RenderStartupSet::Resources)
-                    .in_set(PipelineSet::Unpack),
-            )
-            .add_systems(
-                Render,
-                (
-                    extract,
-                    rebuild.run_if(|resources: Res<UnpackResources>| resources.is_dirty),
-                    rebuild_shared.run_if(|shared: Res<SharedResources>| shared.is_dirty),
-                )
-                    .chain()
-                    .in_set(RenderSet::Extract)
-                    .in_set(PipelineSet::Unpack),
-            )
-            .add_systems(
-                Render,
-                dispatch
-                    .in_set(RenderSet::Execute)
-                    .in_set(PipelineSet::Unpack),
-            );
-    }
-}
-
 fn init_resources(ctx: Res<Ctx>, shared: Res<SharedResources>, mut commands: Commands) {
     commands.insert_resource(UnpackResources::new(&ctx, &shared));
 }
@@ -188,8 +183,8 @@ fn extract(
     let encoder = frame.encoder_mut();
 
     res.command_count = len as u32;
-    res.buffer.upload_iter(commands, encoder, &ctx);
-    res.buffer_size.upload(&[len as u32], encoder, &ctx);
+    res.buffer.write_iter(commands, encoder, &ctx);
+    res.buffer_size.write(&[len as u32], encoder, &ctx);
     res.is_dirty = true;
 }
 

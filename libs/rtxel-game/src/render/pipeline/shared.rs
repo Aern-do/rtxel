@@ -1,27 +1,28 @@
 use bevy_ecs::{
     resource::Resource,
-    schedule::IntoScheduleConfigs,
+    schedule::{IntoScheduleConfigs, ScheduleLabel},
     system::{Commands, Res, ResMut},
     world::World,
 };
 use rtxel_core::{Plugin, Startup, WorldExt};
 use rtxel_gpu::{Ctx, DynamicBuffer, DynamicBufferDescriptor, DynamicBufferKind};
-use wgpu::BufferUsages;
+use wgpu::{BufferUsages, Texture, TextureFormat, TextureUsages};
 
-use crate::{
-    BrickGrid, Frame, GpuBrickMap, GpuWorld, PipelineSet, Render, RenderSet, RenderStartupSet,
-};
+use crate::{BrickGrid, Frame, GpuBrickMap, GpuWorld, PipelineSet, RenderStartupSet};
 
 #[derive(Debug, Resource)]
 pub struct SharedResources {
     pub grid: DynamicBuffer<u32>,
     pub map: DynamicBuffer<GpuBrickMap>,
+    pub out_texture: Texture,
 
     pub is_dirty: bool,
 }
 
 impl SharedResources {
     pub fn new(ctx: &Ctx) -> Self {
+        let (width, height) = ctx.size();
+
         Self {
             grid: DynamicBuffer::new(
                 DynamicBufferDescriptor {
@@ -39,30 +40,29 @@ impl SharedResources {
                 },
                 ctx,
             ),
+            out_texture: ctx.texture(
+                Some("Output Texture"),
+                width,
+                height,
+                TextureFormat::Rgba32Float,
+                TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
+            ),
             is_dirty: false,
         }
     }
 }
 
-pub struct SharedPipelinePlugin;
+pub struct SharedPipelinePlugin<S, C> {
+    pub schedule: S,
+    pub clean: C,
+}
 
-impl Plugin for SharedPipelinePlugin {
+impl<S: ScheduleLabel, C: ScheduleLabel> Plugin for SharedPipelinePlugin<S, C> {
     fn init(self, world: &mut World) {
         world
-            .add_systems(
-                Startup,
-                init.in_set(RenderStartupSet::Resources)
-                    .in_set(PipelineSet::Shared),
-            )
-            .add_systems(
-                Render,
-                (
-                    extract
-                        .in_set(RenderSet::Extract)
-                        .in_set(PipelineSet::Shared),
-                    clear_dirty.in_set(RenderSet::EndFrame),
-                ),
-            );
+            .add_systems(Startup, init.in_set(RenderStartupSet::SharedResources))
+            .add_systems(self.schedule, extract.in_set(PipelineSet::Extract))
+            .add_systems(self.clean, clean);
     }
 }
 
@@ -93,6 +93,6 @@ fn extract(
     }
 }
 
-fn clear_dirty(mut resources: ResMut<SharedResources>) {
+fn clean(mut resources: ResMut<SharedResources>) {
     resources.is_dirty = false
 }

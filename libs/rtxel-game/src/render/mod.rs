@@ -1,6 +1,6 @@
 use bevy_ecs::{
     resource::Resource,
-    schedule::{IntoScheduleConfigs, Schedule, ScheduleLabel, SystemSet},
+    schedule::{IntoScheduleConfigs, ScheduleLabel, SystemSet},
     system::{Commands, Res, ResMut},
     world::World,
 };
@@ -39,20 +39,19 @@ impl Frame {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
-pub struct Render;
+pub struct BeginFrame;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct EndFrame;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Clean;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
 pub enum RenderStartupSet {
     Context,
+    SharedResources,
     Resources,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
-pub enum RenderSet {
-    BeginFrame,
-    Extract,
-    Execute,
-    EndFrame,
 }
 
 pub struct RenderPlugin;
@@ -62,36 +61,37 @@ impl Plugin for RenderPlugin {
         world.insert_resource(GpuWorld::new(16));
         world.init_resource::<Frame>();
 
-        world.add_schedule(Schedule::new(Render));
-        world
-            .resource_mut::<Order>()
-            .insert_after(PostUpdate, Render);
+        let mut order = world.resource_mut::<Order>();
+        order.insert_many_after(
+            PostUpdate,
+            &[BeginFrame.intern(), EndFrame.intern(), Clean.intern()],
+        );
 
-        world
-            .configure_sets(
-                Startup,
-                (RenderStartupSet::Context, RenderStartupSet::Resources).chain(),
+        world.configure_sets(
+            Startup,
+            (
+                RenderStartupSet::Context,
+                RenderStartupSet::SharedResources,
+                RenderStartupSet::Resources,
             )
-            .configure_sets(
-                Render,
-                (
-                    RenderSet::BeginFrame,
-                    RenderSet::Extract,
-                    RenderSet::Execute,
-                    RenderSet::EndFrame,
-                )
-                    .chain(),
-            );
+                .chain(),
+        );
 
+        world.add_systems(
+            Startup,
+            (
+                init_ctx.in_set(RenderStartupSet::Context),
+                init_resources.in_set(RenderStartupSet::Resources),
+            ),
+        );
         world
-            .add_systems(Startup, init_ctx.in_set(RenderStartupSet::Context))
-            .add_systems(Startup, init_resources.in_set(RenderStartupSet::Resources));
+            .add_systems(BeginFrame, begin_frame)
+            .add_systems(EndFrame, end_frame);
 
-        world
-            .add_systems(Render, begin_frame.in_set(RenderSet::BeginFrame))
-            .add_systems(Render, end_frame.in_set(RenderSet::EndFrame));
-
-        world.add_plugin(PipelinePlugin);
+        world.add_plugin(PipelinePlugin {
+            begin_frame: BeginFrame,
+            clean: Clean,
+        });
     }
 }
 

@@ -9,5 +9,7 @@ fn main() {
 fn compile_shaders() -> Result<()> {
     let base_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("shaders");
 
-    compile_slang(base_path.join("unpack.slang"), "unpack")
+    compile_slang(base_path.join("unpack.slang"), "unpack")?;
+    compile_slang(base_path.join("draw.slang"), "draw")?;
+    compile_slang(base_path.join("present.slang"), "present")
 }

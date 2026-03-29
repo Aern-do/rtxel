@@ -37,6 +37,22 @@ impl Order {
 
         self.schedules.insert(position + 1, schedule.intern());
     }
+
+    pub fn insert_many_after(
+        &mut self,
+        after: impl ScheduleLabel,
+        schedules: &[InternedScheduleLabel],
+    ) {
+        let pos = self
+            .schedules
+            .iter()
+            .position(|s| *s == after.intern())
+            .expect("unknown schedule");
+
+        for (i, schedule) in schedules.iter().enumerate() {
+            self.schedules.insert(pos + 1 + i, *schedule);
+        }
+    }
 }
 
 pub struct SchedulePlugin;

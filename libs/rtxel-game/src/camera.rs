@@ -5,6 +5,7 @@ use bevy_ecs::{
     system::{Commands, Query, Res},
     world::World,
 };
+use encase::ShaderType;
 use glam::Vec3;
 use rtxel_core::{
     DeltaTime, KeyCode, Keyboard, MouseMotion, Plugin, Startup, Update, WindowHandle, WorldExt,
@@ -13,7 +14,7 @@ use winit::window::CursorGrabMode;
 
 use crate::Player;
 
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy, ShaderType, Component)]
 pub struct Camera {
     pub origin: Vec3,
     pub yaw: f32,

@@ -40,6 +40,25 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
         )
     }
 
+    fn serialize_elements(&self, elements: &[T]) -> Vec<u8> {
+        match self.descriptor.kind {
+            DynamicBufferKind::Storage => {
+                let mut buffer = StorageBuffer::new(Vec::new());
+                for element in elements {
+                    buffer.write(element).expect("failed to serialize element");
+                }
+                buffer.into_inner()
+            }
+            DynamicBufferKind::Uniform => {
+                let mut buffer = UniformBuffer::new(Vec::new());
+                for element in elements {
+                    buffer.write(element).expect("failed to serialize element");
+                }
+                buffer.into_inner()
+            }
+        }
+    }
+
     pub fn new(descriptor: DynamicBufferDescriptor, ctx: &Ctx) -> Self {
         let buffer = Self::create_buffer(&descriptor, Self::INITIAL_CAPCITY, ctx);
 
@@ -93,7 +112,7 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
         true
     }
 
-    pub fn upload_iter(
+    pub fn write_iter(
         &mut self,
         iter: impl Iterator<Item = T>,
         encoder: &mut CommandEncoder,
@@ -101,31 +120,40 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
     ) {
         // 1 allocations is much better than doing write_buffer multiple times
         let elements = iter.collect::<Vec<_>>();
-        self.upload(&elements, encoder, ctx);
+        self.write(&elements, encoder, ctx);
     }
 
-    pub fn upload(&mut self, elements: &[T], encoder: &mut CommandEncoder, ctx: &Ctx) {
-        self.ensure_capacity(self.size + elements.len() as u64, encoder, ctx);
+    pub fn write(&mut self, elements: &[T], encoder: &mut CommandEncoder, ctx: &Ctx) {
+        let count = elements.len() as u64;
+        self.ensure_capacity(count, encoder, ctx);
 
-        let bytes = match self.descriptor.kind {
-            DynamicBufferKind::Storage => {
-                let mut buffer = StorageBuffer::new(Vec::new());
-                for element in elements {
-                    buffer.write(element).expect("failed to seralize element");
-                }
-                buffer.into_inner()
-            }
-            DynamicBufferKind::Uniform => {
-                let mut buffer = UniformBuffer::new(Vec::new());
-                for element in elements {
-                    buffer.write(element).expect("failed to seralize element");
-                }
-                buffer.into_inner()
-            }
-        };
-
+        let bytes = self.serialize_elements(elements);
         ctx.queue.write_buffer(&self.buffer, 0, &bytes);
-        self.size += elements.len() as u64;
+        self.size = count;
+    }
+
+    pub fn push_iter(
+        &mut self,
+        iter: impl Iterator<Item = T>,
+        encoder: &mut CommandEncoder,
+        ctx: &Ctx,
+    ) {
+        let elements = iter.collect::<Vec<_>>();
+        self.push(&elements, encoder, ctx);
+    }
+
+    pub fn push(&mut self, elements: &[T], encoder: &mut CommandEncoder, ctx: &Ctx) {
+        let count = elements.len() as u64;
+        self.ensure_capacity(self.size + count, encoder, ctx);
+
+        let bytes = self.serialize_elements(elements);
+        let offset = self.size * T::min_size().get();
+        ctx.queue.write_buffer(&self.buffer, offset, &bytes);
+        self.size += count;
+    }
+
+    pub fn clear(&mut self) {
+        self.size = 0;
     }
 
     pub fn mark_fully_used(&mut self) {

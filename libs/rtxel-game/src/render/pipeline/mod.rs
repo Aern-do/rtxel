@@ -1,49 +1,61 @@
 use bevy_ecs::{
-    schedule::{IntoScheduleConfigs, SystemSet},
+    schedule::{ScheduleLabel, SystemSet},
     world::World,
 };
-use rtxel_core::{Plugin, Startup, WorldExt};
+use rtxel_core::{Order, Plugin, WorldExt};
 
-use crate::{Render, shared::SharedPipelinePlugin, unpack::UnpackPipelinePlugin};
+use crate::{
+    draw::DrawPipelinePlugin, present::PresentPipelinePlugin, shared::SharedPipelinePlugin,
+    unpack::UnpackPipelinePlugin,
+};
 
+pub mod draw;
+pub mod present;
 pub mod shared;
 pub mod unpack;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Shared;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Unpack;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Draw;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct Present;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
 pub enum PipelineSet {
-    Shared,
-    Unpack,
-    Compute,
-    Draw,
+    Extract,
+    Dispatch,
 }
 
-pub struct PipelinePlugin;
+#[derive(Debug, Default)]
+pub struct PipelinePlugin<B, C> {
+    pub begin_frame: B,
+    pub clean: C,
+}
 
-impl Plugin for PipelinePlugin {
+impl<B: ScheduleLabel, C: ScheduleLabel> Plugin for PipelinePlugin<B, C> {
     fn init(self, world: &mut World) {
-        world
-            .configure_sets(
-                Startup,
-                (
-                    PipelineSet::Shared,
-                    PipelineSet::Unpack,
-                    PipelineSet::Compute,
-                    PipelineSet::Draw,
-                )
-                    .chain(),
-            )
-            .configure_sets(
-                Render,
-                (
-                    PipelineSet::Shared,
-                    PipelineSet::Unpack,
-                    PipelineSet::Compute,
-                    PipelineSet::Draw,
-                )
-                    .chain(),
-            );
+        let passes = [
+            Shared.intern(),
+            Unpack.intern(),
+            Draw.intern(),
+            Present.intern(),
+        ];
 
-        world.add_plugin(SharedPipelinePlugin);
-        world.add_plugin(UnpackPipelinePlugin);
+        let mut order = world.resource_mut::<Order>();
+        order.insert_many_after(self.begin_frame, &passes);
+
+        world.add_plugin(SharedPipelinePlugin {
+            schedule: Shared,
+            clean: self.clean.intern(),
+        });
+        world.add_plugin(UnpackPipelinePlugin { schedule: Unpack });
+        world.add_plugin(DrawPipelinePlugin { schedule: Draw });
+        world.add_plugin(PresentPipelinePlugin { schedule: Present });
     }
 }

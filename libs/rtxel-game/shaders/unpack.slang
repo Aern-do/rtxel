@@ -33,9 +33,9 @@ void main(uint3 threadId : SV_DispatchThreadID) {
 
     if (cmd.op == UNPACK_OP_CLEAR) {
         map[cmd.map_idx] = {};
-        grid[cmd.grid_idx] = 0xFFFF;
+        grid[cmd.grid_idx] = GRID_EMPTY;
     } else if (cmd.op == UNPACK_OP_UNLOAD) {
-        grid[cmd.grid_idx] = 0;
+        grid[cmd.grid_idx] = GRID_UNLOADED;
     } else if (cmd.op == UNPACK_OP_SET) {
         grid[cmd.grid_idx] = cmd.map_idx + 1;
         BrickMap entry;
