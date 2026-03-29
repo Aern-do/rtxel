@@ -17,13 +17,15 @@ use wgpu::{
     wgt::TextureViewDescriptor,
 };
 
-use crate::{Camera, Frame, PipelineSet, Player, RenderStartupSet, shared::SharedResources};
+use crate::{
+    Camera, Frame, GpuBrickMap, PipelineSet, Player, RenderStartupSet, shared::SharedResources,
+};
 
 type DrawBindGroup = Binding<0, Compute, UniformBuffer<Camera>>;
 
 type SharedBindGroup = (
     Binding<0, Compute, RStorageBuffer<u32>>,
-    Binding<1, Compute, RStorageBuffer<u32>>,
+    Binding<1, Compute, RStorageBuffer<GpuBrickMap>>,
     Binding<2, Compute, WStorageTexture<Rgba32Float>>,
 );
 
@@ -64,7 +66,10 @@ impl DrawPipeline {
     pub fn new(ctx: &Ctx, resources: &DrawResources) -> Self {
         let layout = ctx.pipeline_layout(
             Some("Draw Pipeline Layout"),
-            &[&resources.shared_bg_layout, &resources.bg_layout],
+            &[
+                Some(&resources.shared_bg_layout),
+                Some(&resources.bg_layout),
+            ],
         );
 
         let pipeline = ctx

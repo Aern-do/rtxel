@@ -67,7 +67,10 @@ impl UnpackPipeline {
     pub fn new(ctx: &Ctx, resources: &UnpackResources) -> Self {
         let layout = ctx.pipeline_layout(
             Some("Unpack Pipeline Layout"),
-            &[&resources.bg_layout, &resources.shared_bg_layout],
+            &[
+                Some(&resources.bg_layout),
+                Some(&resources.shared_bg_layout),
+            ],
         );
 
         let pipeline = ctx

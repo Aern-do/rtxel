@@ -1,11 +1,13 @@
-use std::{borrow::Cow, sync::Mutex};
+use std::{borrow::Cow, env, sync::Mutex};
 
 use bevy_ecs::resource::Resource;
+use log::info;
 use wgpu::{
-    Backends, BindGroupLayout, Buffer, BufferUsages, Device, Extent3d, Instance,
-    InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, PowerPreference, PresentMode,
-    Queue, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface,
-    SurfaceConfiguration, SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages,
+    BackendOptions, Backends, BindGroupLayout, Buffer, BufferUsages, Device, Extent3d, Instance,
+    InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, PipelineLayout,
+    PipelineLayoutDescriptor, PowerPreference, PresentMode, Queue, RequestAdapterOptions,
+    ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface, SurfaceConfiguration,
+    SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages, Trace,
     wgt::{BufferDescriptor, DeviceDescriptor, TextureDescriptor},
 };
 
@@ -31,9 +33,14 @@ pub struct Ctx {
 
 impl Ctx {
     pub async fn new(target: impl Into<SurfaceTarget<'static>>, width: u32, height: u32) -> Self {
-        let instance = Instance::new(&InstanceDescriptor {
+        let trace_path = env::var("TRACE_PATH").ok();
+
+        let instance = Instance::new(InstanceDescriptor {
             backends: Backends::from_env().unwrap_or(Backends::PRIMARY),
-            ..Default::default()
+            flags: InstanceFlags::from_env_or_default(),
+            memory_budget_thresholds: MemoryBudgetThresholds::default(),
+            backend_options: BackendOptions::from_env_or_default(),
+            display: None,
         });
 
         let surface = instance
@@ -50,7 +57,12 @@ impl Ctx {
             .expect("failed to get adapter");
 
         let (device, queue) = adapter
-            .request_device(&DeviceDescriptor::default())
+            .request_device(&DeviceDescriptor {
+                trace: trace_path
+                    .map(|path| Trace::Directory(path.into()))
+                    .unwrap_or_default(),
+                ..Default::default()
+            })
             .await
             .expect("failed to get device");
 
@@ -60,6 +72,12 @@ impl Ctx {
 
         config.present_mode = PresentMode::AutoNoVsync;
         surface.configure(&device, &config);
+
+        let info = adapter.get_info();
+        info!(
+            "initialized context for following backend: {}",
+            info.backend
+        );
 
         Self {
             device,
@@ -84,7 +102,7 @@ impl Ctx {
     pub fn pipeline_layout(
         &self,
         label: Option<&str>,
-        bind_group_layouts: &[&BindGroupLayout],
+        bind_group_layouts: &[Option<&BindGroupLayout>],
     ) -> PipelineLayout {
         self.device
             .create_pipeline_layout(&PipelineLayoutDescriptor {

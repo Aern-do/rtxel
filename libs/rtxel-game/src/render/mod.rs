@@ -7,7 +7,7 @@ use bevy_ecs::{
 use pollster::block_on;
 use rtxel_core::{Order, Plugin, PostUpdate, Startup, WindowHandle, WorldExt};
 use rtxel_gpu::Ctx;
-use wgpu::{CommandEncoder, CommandEncoderDescriptor, SurfaceTexture};
+use wgpu::{CommandEncoder, CommandEncoderDescriptor, CurrentSurfaceTexture, SurfaceTexture};
 
 pub mod gpu_world;
 pub mod pipeline;
@@ -22,13 +22,13 @@ pub use slot_allocator::*;
 pub struct Frame {
     pub surface: Option<SurfaceTexture>,
     pub encoder: Option<CommandEncoder>,
+
+    pub is_ignored: bool,
 }
 
 impl Frame {
-    pub fn surface(&self) -> &SurfaceTexture {
-        self.surface
-            .as_ref()
-            .expect("surface texture is missing from frame")
+    pub fn surface(&self) -> Option<&SurfaceTexture> {
+        self.surface.as_ref()
     }
 
     pub fn encoder_mut(&mut self) -> &mut CommandEncoder {
@@ -114,19 +114,26 @@ fn begin_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>) {
             label: Some("Command Encoder"),
         });
 
-    let surface = ctx
-        .surface
-        .get_current_texture()
-        .expect("failed to get surface texture");
+    let surface = match ctx.surface.get_current_texture() {
+        CurrentSurfaceTexture::Success(surface_texture) => Some(surface_texture),
+        CurrentSurfaceTexture::Suboptimal(surface_texture) => Some(surface_texture),
+        CurrentSurfaceTexture::Timeout => None,
+        CurrentSurfaceTexture::Occluded => None,
+        CurrentSurfaceTexture::Outdated => panic!("surface is outdated and wasn't reconfigured"),
+        CurrentSurfaceTexture::Lost => panic!("surface is lost"),
+        CurrentSurfaceTexture::Validation => panic!("surface is invalid"),
+    };
 
     frame.encoder = Some(encoder);
-    frame.surface = Some(surface)
+    frame.surface = surface;
 }
 
 fn end_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>) {
+    let Some(surface) = frame.surface.take() else {
+        return;
+    };
     let encoder = frame.encoder.take().expect("command encoder is missing");
-    let tex = frame.surface.take().expect("surface texture is missing");
 
     ctx.queue.submit(Some(encoder.finish()));
-    tex.present();
+    surface.present();
 }

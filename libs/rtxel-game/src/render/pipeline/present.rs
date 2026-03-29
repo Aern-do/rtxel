@@ -62,7 +62,8 @@ impl PresentPipeline {
         let bg_layout = PresentBindGroup::layout(ctx);
         let bg = Self::create_bind_group(&bg_layout, shared, &sampler, ctx);
 
-        let pipeline_layout = ctx.pipeline_layout(Some("Present Pipeline Layout"), &[&bg_layout]);
+        let pipeline_layout =
+            ctx.pipeline_layout(Some("Present Pipeline Layout"), &[Some(&bg_layout)]);
         let pipeline = ctx
             .render_pipeline(BasePipeline {
                 layout: &pipeline_layout,
@@ -110,7 +111,10 @@ fn dispatch(
     pipeline: Res<PresentPipeline>,
     resources: Res<PresentPipeline>,
 ) {
-    let surface = frame.surface();
+    let Some(surface) = frame.surface() else {
+        return;
+    };
+
     let view = surface
         .texture
         .create_view(&TextureViewDescriptor::default());
