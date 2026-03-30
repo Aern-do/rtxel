@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 bevy_ecs = { workspace = true }
 winit = "0.30.13"
+log =  { workspace = true }

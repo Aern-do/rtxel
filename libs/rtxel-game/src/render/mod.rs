@@ -77,13 +77,7 @@ impl Plugin for RenderPlugin {
                 .chain(),
         );
 
-        world.add_systems(
-            Startup,
-            (
-                init_ctx.in_set(RenderStartupSet::Context),
-                init_resources.in_set(RenderStartupSet::Resources),
-            ),
-        );
+        world.add_systems(Startup, init_ctx.in_set(RenderStartupSet::Context));
         world
             .add_systems(BeginFrame, begin_frame)
             .add_systems(EndFrame, end_frame);
@@ -100,11 +94,6 @@ fn init_ctx(mut commands: Commands, window: Res<WindowHandle>) {
 
     let ctx = block_on(Ctx::new(window.handle.clone(), size.width, size.height));
     commands.insert_resource(ctx);
-}
-
-fn init_resources(ctx: Res<Ctx>, mut commands: Commands) {
-    let (width, height) = ctx.size();
-    commands.insert_resource(Resources::new(width, height, &ctx));
 }
 
 fn begin_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>) {
@@ -128,12 +117,12 @@ fn begin_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>) {
     frame.surface = surface;
 }
 
-fn end_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>) {
-    let Some(surface) = frame.surface.take() else {
-        return;
-    };
+fn end_frame(ctx: Res<Ctx>, mut frame: ResMut<Frame>, window: Res<WindowHandle>) {
     let encoder = frame.encoder.take().expect("command encoder is missing");
-
     ctx.queue.submit(Some(encoder.finish()));
-    surface.present();
+
+    if let Some(surface) = frame.surface.take() {
+        window.handle.pre_present_notify();
+        surface.present();
+    }
 }

@@ -1,6 +1,7 @@
 import world;
 
-struct UnpackCommand {
+struct UnpackCommand
+{
     uint grid_idx;
     uint map_idx;
     uint op;
@@ -23,26 +24,35 @@ RWStructuredBuffer<BrickMap> map;
 
 [shader("compute")]
 [numthreads(64)]
-void main(uint3 threadId : SV_DispatchThreadID) {
-    uint idx = threadId.x;
-    if (idx >= commands_len) {
+void main(uint3 threadId: SV_DispatchThreadID)
+{
+    var idx = threadId.x;
+    if (idx >= commands_len)
+    {
         return;
     }
 
-    UnpackCommand cmd = commands[idx];
+    var cmd = commands[idx];
 
-    if (cmd.op == UNPACK_OP_CLEAR) {
+    if (cmd.op == UNPACK_OP_CLEAR)
+    {
         map[cmd.map_idx] = {};
         grid[cmd.grid_idx] = GRID_EMPTY;
-    } else if (cmd.op == UNPACK_OP_UNLOAD) {
+    }
+    else if (cmd.op == UNPACK_OP_UNLOAD)
+    {
         grid[cmd.grid_idx] = GRID_UNLOADED;
-    } else if (cmd.op == UNPACK_OP_SET) {
-        grid[cmd.grid_idx] = cmd.map_idx + 1;
-        BrickMap entry;
-        for (uint i = 0; i < 16; i++) {
+    }
+    else if (cmd.op == UNPACK_OP_SET)
+    {
+        BrickMap entry = {};
+        entry.is_requested = false;
+        for (uint i = 0; i < 16; i++)
+        {
             entry.mask[i] = cmd.data[i];
         }
 
         map[cmd.map_idx] = entry;
+        grid[cmd.grid_idx] = cmd.map_idx + 1;
     }
 }

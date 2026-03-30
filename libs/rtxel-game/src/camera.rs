@@ -41,19 +41,19 @@ impl Camera {
         .normalize();
 
         let world_up = Vec3::Y;
-        let right = self.forward.cross(world_up).normalize();
-        self.up = right.cross(self.forward).normalize();
+        let right = world_up.cross(self.forward).normalize();
+        self.up = self.forward.cross(right).normalize();
     }
 
     pub fn vectors(&self) -> (Vec3, Vec3, Vec3) {
-        let right = self.forward.cross(Vec3::Y).normalize();
-        let up = right.cross(self.forward).normalize();
+        let right = Vec3::Y.cross(self.forward).normalize();
+        let up = self.forward.cross(right).normalize();
         (self.forward, right, up)
     }
 }
 
 const SENSITIVITY: f32 = 0.1;
-const MOVE_SENSITIVITY: f32 = 15.0;
+const MOVE_SENSITIVITY: f32 = 45.0;
 
 pub struct CameraPlugin;
 
@@ -74,7 +74,7 @@ fn setup_camera(window: Res<WindowHandle>, mut commands: Commands) {
     window.handle.set_cursor_visible(false);
 
     let mut camera = Camera {
-        origin: Vec3::new(0., 1., -1.),
+        origin: Vec3::new(0., 64., -1.),
         forward: Vec3::Z,
         up: Vec3::Y,
         aspect: size.width as f32 / size.height as f32,

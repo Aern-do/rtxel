@@ -1,6 +1,6 @@
 use std::{borrow::Cow, marker::PhantomData};
 
-use encase::{ShaderType, StorageBuffer, UniformBuffer, internal::WriteInto};
+use encase::{ShaderType, StorageBuffer, internal::WriteInto};
 use log::info;
 use wgpu::{Buffer, BufferUsages, CommandEncoder};
 
@@ -40,23 +40,20 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
         )
     }
 
+    // maybe using fucking encase wasnt a best idea
+    // but its too late now
     fn serialize_elements(&self, elements: &[T]) -> Vec<u8> {
-        match self.descriptor.kind {
-            DynamicBufferKind::Storage => {
-                let mut buffer = StorageBuffer::new(Vec::new());
-                for element in elements {
-                    buffer.write(element).expect("failed to serialize element");
-                }
-                buffer.into_inner()
-            }
-            DynamicBufferKind::Uniform => {
-                let mut buffer = UniformBuffer::new(Vec::new());
-                for element in elements {
-                    buffer.write(element).expect("failed to serialize element");
-                }
-                buffer.into_inner()
-            }
+        let stride = T::min_size().get() as usize;
+        let mut bytes = Vec::with_capacity(stride * elements.len());
+
+        for element in elements {
+            let mut tmp = StorageBuffer::new(Vec::with_capacity(stride));
+            tmp.write(element).expect("failed to serialize element");
+
+            bytes.extend_from_slice(&tmp.into_inner());
         }
+
+        bytes
     }
 
     pub fn new(descriptor: DynamicBufferDescriptor, ctx: &Ctx) -> Self {

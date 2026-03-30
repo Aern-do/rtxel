@@ -86,7 +86,7 @@ fn extract(
 
     if resources
         .grid
-        .ensure_capacity(grid.size as u64, frame.encoder_mut(), &ctx)
+        .ensure_capacity((grid.size as u64).pow(3), frame.encoder_mut(), &ctx)
     {
         resources.grid.mark_fully_used();
         resources.is_dirty = true;

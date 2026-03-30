@@ -78,6 +78,10 @@ impl BrickMap {
         (index / 32, 1 << (index % 32))
     }
 
+    pub fn count(&self) -> u32 {
+        self.mask.iter().map(|w| w.count_ones()).sum()
+    }
+
     pub fn get(&self, pos: UVec3) -> bool {
         let (word, bit) = Self::index(pos);
         self.mask[word] & bit != 0

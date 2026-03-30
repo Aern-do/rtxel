@@ -1,5 +1,5 @@
 use bevy_ecs::{
-    schedule::{ScheduleLabel, SystemSet},
+    schedule::{InternedScheduleLabel, IntoScheduleConfigs, ScheduleLabel, SystemSet},
     world::World,
 };
 use rtxel_core::{Order, Plugin, WorldExt};
@@ -47,8 +47,7 @@ impl<B: ScheduleLabel, C: ScheduleLabel> Plugin for PipelinePlugin<B, C> {
             Present.intern(),
         ];
 
-        let mut order = world.resource_mut::<Order>();
-        order.insert_many_after(self.begin_frame, &passes);
+        add_pases(self.begin_frame, world, &passes);
 
         world.add_plugin(SharedPipelinePlugin {
             schedule: Shared,
@@ -57,5 +56,18 @@ impl<B: ScheduleLabel, C: ScheduleLabel> Plugin for PipelinePlugin<B, C> {
         world.add_plugin(UnpackPipelinePlugin { schedule: Unpack });
         world.add_plugin(DrawPipelinePlugin { schedule: Draw });
         world.add_plugin(PresentPipelinePlugin { schedule: Present });
+    }
+}
+
+fn add_pases<B: ScheduleLabel>(
+    begin_frame: B,
+    world: &mut World,
+    passes: &[InternedScheduleLabel],
+) {
+    let mut order = world.resource_mut::<Order>();
+    order.insert_many_after(begin_frame, passes);
+
+    for pass in passes {
+        world.configure_sets(*pass, (PipelineSet::Extract, PipelineSet::Dispatch).chain());
     }
 }

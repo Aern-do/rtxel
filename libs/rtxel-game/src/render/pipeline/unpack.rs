@@ -210,10 +210,6 @@ fn dispatch(
     if resources.command_count == 0 {
         return;
     }
-    info!(
-        "dispatched unpack pass with {} commands",
-        resources.command_count
-    );
 
     let encoder = frame.encoder_mut();
     {
@@ -227,5 +223,10 @@ fn dispatch(
 
         let workgroups = resources.command_count.div_ceil(WORKGROUP_SIZE);
         pass.dispatch_workgroups(workgroups, 1, 1);
+
+        info!(
+            "dispatched unpack pass with {} commands",
+            resources.command_count
+        );
     }
 }

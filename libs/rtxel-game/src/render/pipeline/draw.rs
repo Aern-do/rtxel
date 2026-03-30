@@ -51,6 +51,7 @@ impl<S: ScheduleLabel> Plugin for DrawPipelinePlugin<S> {
                     extract_camera,
                     rebuild.run_if(|shared: Res<SharedResources>| shared.is_dirty),
                 )
+                    .chain()
                     .in_set(PipelineSet::Extract),
             )
             .add_systems(self.schedule, dispatch.in_set(PipelineSet::Dispatch));

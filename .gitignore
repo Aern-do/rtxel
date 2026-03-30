@@ -1,1 +1,3 @@
 /target
+/trace
+run_debug.sh

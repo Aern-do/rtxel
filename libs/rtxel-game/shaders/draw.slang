@@ -1,54 +1,39 @@
 import world;
-
-struct Camera {
-    float3 origin;
-    float yaw;
-    float pitch;
-
-    float3 forward;
-    float3 up;
-    float aspect;
-    float fov;
-
-    uint frame_count;
-};
+import traverse;
+import core.camera;
+import core.ray;
+import core.dda;
 
 [vk::binding(0, 0)]
-StructuredBuffer<uint> grid;
+StructuredBuffer<uint> bricks;
 [vk::binding(1, 0)]
-StructuredBuffer<BrickMap> map;
+StructuredBuffer<BrickMap> maps;
 [vk::binding(2, 0)]
 WTexture2D<float4> outputTexture;
 
 [vk::binding(0, 1)]
 ConstantBuffer<Camera> camera;
 
-float3 getRayDir(float2 uv) {
-    float3 right = normalize(cross(camera.forward, camera.up));
-    float3 up = normalize(cross(right, camera.forward));
-    float halfTan = tan(camera.fov * 0.5);
-    float2 ndc = (uv - 0.5) * 2.0;
-    ndc.y = -ndc.y;
-
-    return normalize(
-        camera.forward
-            + ndc.x * camera.aspect * halfTan * right
-            + ndc.y * halfTan * up
-    );
-}
-
 [shader("compute")]
 [numthreads(8, 8)]
-void main(uint3 threadId: SV_DispatchThreadID) {
+void main(uint3 threadId: SV_DispatchThreadID)
+{
     uint width, height;
     outputTexture.GetDimensions(width, height);
 
     if (threadId.x >= width || threadId.y >= height)
         return;
 
-    float2 uv = float2(threadId.xy) / float2(width, height);
-    float3 dir = getRayDir(uv);
+    var uv = (float2(threadId.xy) + 0.5) / float2(width, height);
+    var ray = camera.createRay(uv);
 
-    float3 color = float3(1.0);
+    var color = float3(0.0, 0.0, 0.4);
+
+    var traverser = Traverser(bricks, maps);
+    var hit = traverser.traverse(ray);
+    if (hit.didHit) {
+        color = float3(hit.t / 1024);
+    }
+
     outputTexture.Store(threadId.xy, float4(color, 1.0));
 }
