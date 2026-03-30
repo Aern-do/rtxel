@@ -26,16 +26,16 @@ public struct Traverser
         {
             var hit = brickIter.hit();
 
-            var brickMap = BrickMapVolume(maps[brick].mask, hit.voxelMin, hit.voxelMax);
-            var brickMapIter = DDAIterator<BrickMapVolume>(brickMap, ray, 64);
+            var brickMap = BrickMapVolume(maps[brick - 1].mask, hit.voxelMin, hit.voxelMax);
+            var brickMapIter = DDAIterator<BrickMapVolume>(brickMap, ray, 128);
 
             bool voxel;
             if (brickMapIter.next(voxel))
             {
-                var hit = brickIter.hit();
+                var brickHit = brickMapIter.hit();
 
                 result.didHit = true;
-                result.t = hit.t;
+                result.t = brickHit.t;
                 return result;
             }
         }
@@ -64,7 +64,7 @@ public struct BrickGridVolume : IVolume
     {
         var config = config();
 
-        int idx = pos.z * config.size * config.size + pos.y * config.size + pos.x;
+        int idx = pos.x + pos.y * config.size + pos.z * config.size * config.size;
         return buffer[idx];
     }
 
