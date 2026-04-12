@@ -56,6 +56,47 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
         bytes
     }
 
+    fn grow(
+        &mut self,
+        required: u64,
+        encoder: &mut CommandEncoder,
+        ctx: &Ctx,
+        preserve: bool,
+    ) -> bool {
+        if required <= self.capacity {
+            return false;
+        }
+
+        let old_capacity = self.capacity;
+
+        let growth = (Self::GROWTH_FACTOR as f64).ln();
+        let steps = ((required as f64 / self.capacity as f64).ln() / growth).ceil() as u32;
+        let new_capacity =
+            (self.capacity as f64 * (Self::GROWTH_FACTOR as f64).powi(steps as i32)) as u64;
+
+        self.capacity = new_capacity;
+
+        let new_buffer = Self::create_buffer(&self.descriptor, self.capacity, ctx);
+        if preserve {
+            encoder.copy_buffer_to_buffer(
+                &self.buffer,
+                0,
+                &new_buffer,
+                0,
+                old_capacity * T::min_size().get(),
+            );
+        }
+        self.buffer = new_buffer;
+
+        if let Some(label) = &self.descriptor.label {
+            info!("buffer \"{label}\" resized from {old_capacity} to {new_capacity}");
+        } else {
+            info!("buffer resized from {old_capacity} to {new_capacity}");
+        }
+
+        true
+    }
+
     pub fn new(descriptor: DynamicBufferDescriptor, ctx: &Ctx) -> Self {
         let buffer = Self::create_buffer(&descriptor, Self::INITIAL_CAPCITY, ctx);
 
@@ -77,36 +118,7 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
         encoder: &mut CommandEncoder,
         ctx: &Ctx,
     ) -> bool {
-        if required <= self.capacity {
-            return false;
-        }
-
-        let old_capacity = self.capacity;
-
-        let growth = (Self::GROWTH_FACTOR as f64).ln();
-        let steps = ((required as f64 / self.capacity as f64).ln() / growth).ceil() as u32;
-        let new_capacity =
-            (self.capacity as f64 * (Self::GROWTH_FACTOR as f64).powi(steps as i32)) as u64;
-
-        self.capacity = new_capacity;
-
-        let new_buffer = Self::create_buffer(&self.descriptor, self.capacity, ctx);
-        encoder.copy_buffer_to_buffer(
-            &self.buffer,
-            0,
-            &new_buffer,
-            0,
-            old_capacity * T::min_size().get(),
-        );
-        self.buffer = new_buffer;
-
-        if let Some(label) = &self.descriptor.label {
-            info!("buffer \"{label}\" resized from {old_capacity} to {new_capacity}",)
-        } else {
-            info!("buffer resized from {old_capacity} to {new_capacity}",)
-        };
-
-        true
+        self.grow(required, encoder, ctx, true)
     }
 
     pub fn write_iter(
@@ -122,7 +134,7 @@ impl<T: ShaderType + WriteInto> DynamicBuffer<T> {
 
     pub fn write(&mut self, elements: &[T], encoder: &mut CommandEncoder, ctx: &Ctx) {
         let count = elements.len() as u64;
-        self.ensure_capacity(count, encoder, ctx);
+        self.grow(count, encoder, ctx, false);
 
         let bytes = self.serialize_elements(elements);
         ctx.queue.write_buffer(&self.buffer, 0, &bytes);

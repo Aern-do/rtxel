@@ -13,12 +13,13 @@ fn compile_shaders() -> Result<()> {
     compile_slang(base_path.join("draw.slang"), "draw")?;
     compile_slang(base_path.join("present.slang"), "present")?;
 
-    // TODO: find deps automaticly via slangc reflect
+    // TODO: find deps automaticly via slang reflection
     mark_as_dep(base_path.join("world.slang"));
     mark_as_dep(base_path.join("traverse.slang"));
     mark_as_dep(base_path.join("core").join("dda.slang"));
     mark_as_dep(base_path.join("core").join("ray.slang"));
     mark_as_dep(base_path.join("core").join("volume.slang"));
+
 
     Ok(())
 }

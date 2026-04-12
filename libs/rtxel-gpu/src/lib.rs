@@ -3,12 +3,7 @@ use std::{borrow::Cow, env, sync::Mutex};
 use bevy_ecs::resource::Resource;
 use log::info;
 use wgpu::{
-    BackendOptions, Backends, BindGroupLayout, Buffer, BufferUsages, Device, Extent3d, Instance,
-    InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, PipelineLayout,
-    PipelineLayoutDescriptor, PowerPreference, PresentMode, Queue, RequestAdapterOptions,
-    ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface, SurfaceConfiguration,
-    SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages, Trace,
-    wgt::{BufferDescriptor, DeviceDescriptor, TextureDescriptor},
+    BackendOptions, Backends, BindGroupLayout, Buffer, BufferUsages, Device, Extent3d, Instance, InstanceDescriptor, InstanceFlags, Limits, MemoryBudgetThresholds, PipelineLayout, PipelineLayoutDescriptor, PowerPreference, PresentMode, Queue, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, Surface, SurfaceConfiguration, SurfaceTarget, Texture, TextureDimension, TextureFormat, TextureUsages, Trace, wgt::{BufferDescriptor, DeviceDescriptor, TextureDescriptor}
 };
 
 pub mod bind_group;
@@ -61,6 +56,11 @@ impl Ctx {
                 trace: trace_path
                     .map(|path| Trace::Directory(path.into()))
                     .unwrap_or_default(),
+                    required_limits: Limits {
+                        max_storage_buffer_binding_size: 2048 * 1024 * 1024,
+                        max_buffer_size: 2048 * 1024 * 1024,
+                        ..Default::default()
+                    },
                 ..Default::default()
             })
             .await

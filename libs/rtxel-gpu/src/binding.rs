@@ -1,4 +1,3 @@
-use core::panic;
 use std::marker::PhantomData;
 
 use encase::ShaderType;
@@ -67,24 +66,47 @@ impl AsTextureFormat for Rgba32Float {
     }
 }
 
-pub struct StorageTexture<const READ: bool, const WRITE: bool, F>(PhantomData<F>);
-pub type RStorageTexture<F> = StorageTexture<true, false, F>;
-pub type WStorageTexture<F> = StorageTexture<false, true, F>;
-pub type RWStorageTexture<F> = StorageTexture<true, true, F>;
+pub trait AsStorageTextureAccess {
+    fn as_storage_texture_access() -> StorageTextureAccess;
+}
 
-impl<const READ: bool, const WRITE: bool, F: AsTextureFormat> Bindable
-    for StorageTexture<READ, WRITE, F>
+pub struct Read;
+
+impl AsStorageTextureAccess for Read {
+    fn as_storage_texture_access() -> StorageTextureAccess {
+        StorageTextureAccess::ReadOnly
+    }
+}
+
+pub struct Write;
+
+impl AsStorageTextureAccess for Write {
+    fn as_storage_texture_access() -> StorageTextureAccess {
+        StorageTextureAccess::WriteOnly
+    }
+}
+
+pub struct ReadWrite;
+
+impl AsStorageTextureAccess for ReadWrite {
+    fn as_storage_texture_access() -> StorageTextureAccess {
+        StorageTextureAccess::ReadWrite
+    }
+}
+
+pub struct StorageTexture<S, F>(PhantomData<(S, F)>);
+pub type RStorageTexture<F> = StorageTexture<Read, F>;
+pub type WStorageTexture<F> = StorageTexture<Write, F>;
+pub type RWStorageTexture<F> = StorageTexture<ReadWrite, F>;
+
+impl<S: AsStorageTextureAccess, F: AsTextureFormat> Bindable
+    for StorageTexture<S, F>
 {
     type Resource = TextureView;
 
     fn binding_type() -> BindingType {
         BindingType::StorageTexture {
-            access: match (READ, WRITE) {
-                (true, true) => StorageTextureAccess::ReadWrite,
-                (true, false) => StorageTextureAccess::ReadOnly,
-                (false, true) => StorageTextureAccess::WriteOnly,
-                _ => panic!("texture must at least have read or write enabled"),
-            },
+            access: S::as_storage_texture_access(),
             format: F::texture_format(),
             view_dimension: TextureViewDimension::D2,
         }

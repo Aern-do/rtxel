@@ -21,6 +21,7 @@ public struct DDAHit
     public int axis;
     public float3 voxelMin;
     public float3 voxelMax;
+    public int3 voxelPos;
 
     public float3 normal(float3 rayDir)
     {
@@ -50,7 +51,7 @@ public struct DDAIterator<V : IVolume>
 
         var config = volume.config();
 
-        var entryTime = rayAABB(config.min, config.max, ray);
+        var entryTime = rayAABB(config.min, config.max, ray, state.axis);
         if (entryTime >= 1e30)
             return;
 
@@ -172,6 +173,7 @@ public struct DDAIterator<V : IVolume>
         var config = volume.config();
         h.voxelMin = config.min + float3(state.pos) * voxelSize;
         h.voxelMax = h.voxelMin + voxelSize;
+        h.voxelPos = state.pos;
 
         return h;
     }
@@ -187,10 +189,11 @@ public struct DDAIterator<V : IVolume>
         return float(config.size) / (config.max - config.min);
     }
 
-    private static float rayAABB(float3 bmin, float3 bmax, Ray ray)
+    private static float rayAABB(float3 bmin, float3 bmax, Ray ray, out int entryAxis)
     {
         var tmin = 0.0;
         var tmax = 1e30;
+        entryAxis = 0;
 
         [unroll]
         for (int i = 0; i < 3; ++i)
@@ -201,7 +204,11 @@ public struct DDAIterator<V : IVolume>
             var dmin = min(t1, t2);
             var dmax = max(t1, t2);
 
-            tmin = max(dmin, tmin);
+            if (dmin > tmin)
+            {
+                tmin = dmin;
+                entryAxis = i;
+            }
             tmax = min(dmax, tmax);
         }
 

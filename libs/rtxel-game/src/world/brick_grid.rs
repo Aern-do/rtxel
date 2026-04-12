@@ -1,6 +1,8 @@
 use bevy_ecs::resource::Resource;
 use glam::{IVec3, USizeVec3, UVec3};
 
+use crate::MaterialId;
+
 fn flatten(pos: USizeVec3, size: usize) -> usize {
     pos.x + pos.y * size + pos.z * size * size
 }
@@ -42,7 +44,7 @@ impl BrickGrid {
         &mut self.grid[idx]
     }
 
-    pub fn set_voxel(&mut self, pos: IVec3) -> Edit {
+    pub fn set_voxel(&mut self, pos: IVec3, material: MaterialId) -> Edit {
         let brick_size = BrickMap::SIZE as i32;
 
         let brick_pos = pos.div_euclid(IVec3::splat(brick_size));
@@ -50,7 +52,7 @@ impl BrickGrid {
 
         let grid_idx = self.brick_idx(brick_pos);
         let brick = &mut self.grid[grid_idx];
-        brick.set(local_pos);
+        brick.set(local_pos, material);
 
         Edit::Set {
             grid_idx,
@@ -59,15 +61,26 @@ impl BrickGrid {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BrickMap {
     pub mask: [u32; Self::WORDS],
-    pub is_dirty: bool,
+    pub materials: [MaterialId; Self::VOLUME],
+}
+
+impl Default for BrickMap {
+    fn default() -> Self {
+        Self {
+            mask: [0; Self::WORDS],
+            materials: [MaterialId::AIR; Self::VOLUME],
+        }
+    }
 }
 
 impl BrickMap {
     pub const SIZE: usize = 8;
-    const WORDS: usize = Self::SIZE.pow(3) / 32;
+    pub const VOLUME: usize = Self::SIZE.pow(3);
+
+    const WORDS: usize = Self::VOLUME / 32;
 
     pub fn new() -> Self {
         Self::default()
@@ -87,21 +100,32 @@ impl BrickMap {
         self.mask[word] & bit != 0
     }
 
-    pub fn set(&mut self, pos: UVec3) {
-        self.is_dirty = true;
+    pub fn get_material(&self, pos: UVec3) -> MaterialId {
+        self.materials[flatten(pos.as_usizevec3(), Self::SIZE)]
+    }
 
+    pub fn set(&mut self, pos: UVec3, material: MaterialId) {
         let (word, bit) = Self::index(pos);
         self.mask[word] |= bit;
+        self.materials[flatten(pos.as_usizevec3(), Self::SIZE)] = material;
     }
 
     pub fn clear(&mut self, pos: UVec3) {
-        self.is_dirty = true;
-
         let (word, bit) = Self::index(pos);
         self.mask[word] &= !bit;
+        self.materials[flatten(pos.as_usizevec3(), Self::SIZE)] = MaterialId::AIR;
     }
 
     pub fn is_empty(&self) -> bool {
         self.mask.iter().all(|&w| w == 0)
+    }
+
+    pub fn uniform_material(&self) -> Option<MaterialId> {
+        let first = self.materials.iter().find(|&&m| m != MaterialId::AIR)?;
+        self.materials
+            .iter()
+            .filter(|&&m| m != MaterialId::AIR)
+            .all(|&m| m == *first)
+            .then_some(*first)
     }
 }

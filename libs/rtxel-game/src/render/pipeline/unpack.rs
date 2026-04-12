@@ -8,28 +8,15 @@ use log::info;
 use rtxel_core::{Plugin, Startup, WorldExt};
 use rtxel_gpu::{
     AsBindGroup, BaseComputePipeline, Binding, Compute, Ctx, DynamicBuffer,
-    DynamicBufferDescriptor, DynamicBufferKind, RWStorageBuffer,
+    DynamicBufferDescriptor, DynamicBufferKind,
     binding::{RStorageBuffer, UniformBuffer},
 };
-use wgpu::{BindGroup, BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline};
+use wgpu::{BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline};
 
 use crate::{
-    Frame, GpuBrickMap, GpuWorld, PipelineSet, RenderStartupSet, UnpackCommand,
-    shared::SharedResources,
+    Frame, GpuWorld, PipelineSet, RenderStartupSet, UnpackCommandEncoder,
+    shared::{GridBinding, MapBinding, PalleteBinding, SharedResources},
 };
-
-type UnpackBindGroup = (
-    Binding<0, Compute, RStorageBuffer<UnpackCommand>>,
-    Binding<1, Compute, UniformBuffer<u32>>,
-);
-
-type SharedBindGroup = (
-    Binding<0, Compute, RWStorageBuffer<u32>>,
-    Binding<1, Compute, RWStorageBuffer<GpuBrickMap>>,
-);
-
-const UNPACK_SHADER: &str = include_str!(env!("SHADER_unpack"));
-const WORKGROUP_SIZE: u32 = 64;
 
 pub struct UnpackPipelinePlugin<S> {
     pub schedule: S,
@@ -44,34 +31,37 @@ impl<S: ScheduleLabel> Plugin for UnpackPipelinePlugin<S> {
                     .chain()
                     .in_set(RenderStartupSet::Resources),
             )
-            .add_systems(
-                self.schedule.intern(),
-                (
-                    extract,
-                    rebuild.run_if(|resources: Res<UnpackResources>| resources.is_dirty),
-                    rebuild_shared.run_if(|shared: Res<SharedResources>| shared.is_dirty),
-                )
-                    .chain()
-                    .in_set(PipelineSet::Extract),
-            )
+            .add_systems(self.schedule.intern(), extract.in_set(PipelineSet::Extract))
             .add_systems(self.schedule, dispatch.in_set(PipelineSet::Dispatch));
     }
 }
 
+type CommandsBinding<const IDX: usize> = Binding<IDX, Compute, RStorageBuffer<u32>>;
+type CommandsSizeBinding<const IDX: usize> = Binding<IDX, Compute, UniformBuffer<u32>>;
+type OffsetsBinding<const IDX: usize> = Binding<IDX, Compute, RStorageBuffer<u32>>;
+
+type UnpackBindGroup = (
+    CommandsBinding<0>,
+    CommandsSizeBinding<1>,
+    OffsetsBinding<2>,
+    MapBinding<3, true>,
+    GridBinding<4, true>,
+    PalleteBinding<5, true>,
+);
+
+const UNPACK_SHADER: &str = include_str!(env!("SHADER_unpack"));
+const WORKGROUP_SIZE: u32 = 64;
+
 #[derive(Debug, Resource)]
 pub struct UnpackPipeline {
     pub pipeline: ComputePipeline,
+    pub bg_layout: BindGroupLayout,
 }
 
 impl UnpackPipeline {
-    pub fn new(ctx: &Ctx, resources: &UnpackResources) -> Self {
-        let layout = ctx.pipeline_layout(
-            Some("Unpack Pipeline Layout"),
-            &[
-                Some(&resources.bg_layout),
-                Some(&resources.shared_bg_layout),
-            ],
-        );
+    pub fn new(ctx: &Ctx) -> Self {
+        let bg_layout = UnpackBindGroup::layout(&ctx);
+        let layout = ctx.pipeline_layout(Some("Unpack Pipeline Layout"), &[Some(&bg_layout)]);
 
         let pipeline = ctx
             .compute_pipeline(BaseComputePipeline {
@@ -82,93 +72,64 @@ impl UnpackPipeline {
             .label("Unpack Compute Pipeline")
             .build();
 
-        Self { pipeline }
+        Self {
+            pipeline,
+            bg_layout,
+        }
     }
 }
 
 #[derive(Debug, Resource)]
 pub struct UnpackResources {
-    pub buffer: DynamicBuffer<UnpackCommand>,
-    pub buffer_size: DynamicBuffer<u32>,
+    pub command_buffer: DynamicBuffer<u32>,
+    pub command_size_buffer: DynamicBuffer<u32>,
+    pub offset_buffer: DynamicBuffer<u32>,
+
     pub command_count: u32,
-
-    pub bg: BindGroup,
-    pub bg_layout: BindGroupLayout,
-    pub shared_bg: BindGroup,
-    pub shared_bg_layout: BindGroupLayout,
-
-    pub is_dirty: bool,
 }
 
 impl UnpackResources {
-    pub fn new(ctx: &Ctx, shared: &SharedResources) -> Self {
-        let buffer = DynamicBuffer::new(
+    pub fn new(ctx: &Ctx) -> Self {
+        let command_buffer = DynamicBuffer::new(
             DynamicBufferDescriptor {
-                label: Some("Unpack Dynamic Buffer".into()),
+                label: Some("Unpack Command Dynamic Buffer".into()),
                 usage: BufferUsages::STORAGE,
                 kind: DynamicBufferKind::Storage,
             },
             ctx,
         );
-        let buffer_size = DynamicBuffer::new(
+        let command_size_buffer = DynamicBuffer::new(
             DynamicBufferDescriptor {
-                label: Some("Unpack Dynamic Buffer Size".into()),
+                label: Some("Unpack Command Dynamic Buffer Size".into()),
                 usage: BufferUsages::UNIFORM,
                 kind: DynamicBufferKind::Uniform,
             },
             ctx,
         );
-
-        let bg_layout = UnpackBindGroup::layout(ctx);
-        let bg = Self::create_bind_group(ctx, &bg_layout, &buffer, &buffer_size);
-
-        let shared_bg_layout = SharedBindGroup::layout(ctx);
-        let shared_bg = Self::create_shared_bind_group(ctx, &shared_bg_layout, shared);
+        let offset_buffer = DynamicBuffer::new(
+            DynamicBufferDescriptor {
+                label: Some("Unpack Offset Dynamic Buffer".into()),
+                usage: BufferUsages::STORAGE,
+                kind: DynamicBufferKind::Storage,
+            },
+            ctx,
+        );
 
         Self {
-            buffer,
-            buffer_size,
-            bg_layout,
-            bg,
-            shared_bg,
-            shared_bg_layout,
+            command_buffer,
+            command_size_buffer,
+            offset_buffer,
             command_count: 0,
-            is_dirty: false,
         }
     }
-
-    fn create_bind_group(
-        ctx: &Ctx,
-        layout: &BindGroupLayout,
-        buffer: &DynamicBuffer<UnpackCommand>,
-        buffer_size: &DynamicBuffer<u32>,
-    ) -> BindGroup {
-        UnpackBindGroup::bind_group(ctx, layout, (buffer.buffer(), buffer_size.buffer()))
-    }
-
-    fn create_shared_bind_group(
-        ctx: &Ctx,
-        layout: &BindGroupLayout,
-        shared: &SharedResources,
-    ) -> BindGroup {
-        SharedBindGroup::bind_group(ctx, layout, (shared.grid.buffer(), shared.map.buffer()))
-    }
-
-    pub fn rebuild_bind_group(&mut self, ctx: &Ctx) {
-        self.bg = Self::create_bind_group(ctx, &self.bg_layout, &self.buffer, &self.buffer_size);
-    }
-
-    pub fn rebuild_shared_bind_group(&mut self, ctx: &Ctx, shared: &SharedResources) {
-        self.shared_bg = Self::create_shared_bind_group(ctx, &self.shared_bg_layout, shared);
-    }
 }
 
-fn init_resources(ctx: Res<Ctx>, shared: Res<SharedResources>, mut commands: Commands) {
-    commands.insert_resource(UnpackResources::new(&ctx, &shared));
+fn init_resources(ctx: Res<Ctx>, mut commands: Commands) {
+    commands.insert_resource(UnpackResources::new(&ctx));
 }
 
-fn init_pipeline(ctx: Res<Ctx>, resources: Res<UnpackResources>, mut commands: Commands) {
-    commands.insert_resource(UnpackPipeline::new(&ctx, &resources));
+fn init_pipeline(ctx: Res<Ctx>, mut commands: Commands) {
+    commands.insert_resource(UnpackPipeline::new(&ctx));
 }
 
 fn extract(
@@ -182,34 +143,44 @@ fn extract(
         res.command_count = 0;
         return;
     }
+    let mut command_encoder = UnpackCommandEncoder::new();
+    for command in commands {
+        command_encoder.write_command(command);
+    }
 
-    let encoder = frame.encoder_mut();
+    let (commands, offsets) = command_encoder.finish();
 
+    res.command_buffer
+        .write(&commands, frame.encoder_mut(), &ctx);
+    res.command_size_buffer
+        .write(&[len as u32], frame.encoder_mut(), &ctx);
+    res.offset_buffer.write(&offsets, frame.encoder_mut(), &ctx);
     res.command_count = len as u32;
-    res.buffer.write_iter(commands, encoder, &ctx);
-    res.buffer_size.write(&[len as u32], encoder, &ctx);
-    res.is_dirty = true;
-}
-
-fn rebuild(ctx: Res<Ctx>, mut res: ResMut<UnpackResources>) {
-    res.rebuild_bind_group(&ctx);
-    res.is_dirty = false;
-    info!("unpack bind group rebuilt");
-}
-
-fn rebuild_shared(ctx: Res<Ctx>, shared: Res<SharedResources>, mut res: ResMut<UnpackResources>) {
-    res.rebuild_shared_bind_group(&ctx, &shared);
-    info!("unpack shared bind group rebuilt");
 }
 
 fn dispatch(
     mut frame: ResMut<Frame>,
     pipeline: Res<UnpackPipeline>,
     resources: Res<UnpackResources>,
+    shared_resoucres: Res<SharedResources>,
+    ctx: Res<Ctx>,
 ) {
     if resources.command_count == 0 {
         return;
     }
+
+    let bind_group = UnpackBindGroup::bind_group(
+        &ctx,
+        &pipeline.bg_layout,
+        (
+            resources.command_buffer.buffer(),
+            resources.command_size_buffer.buffer(),
+            resources.offset_buffer.buffer(),
+            shared_resoucres.map.buffer(),
+            shared_resoucres.grid.buffer(),
+            shared_resoucres.palletes.buffer(),
+        ),
+    );
 
     let encoder = frame.encoder_mut();
     {
@@ -218,8 +189,7 @@ fn dispatch(
             timestamp_writes: None,
         });
         pass.set_pipeline(&pipeline.pipeline);
-        pass.set_bind_group(0, &resources.bg, &[]);
-        pass.set_bind_group(1, &resources.shared_bg, &[]);
+        pass.set_bind_group(0, &bind_group, &[]);
 
         let workgroups = resources.command_count.div_ceil(WORKGROUP_SIZE);
         pass.dispatch_workgroups(workgroups, 1, 1);

@@ -5,15 +5,35 @@ use bevy_ecs::{
     world::World,
 };
 use rtxel_core::{Plugin, Startup, WorldExt};
-use rtxel_gpu::{Ctx, DynamicBuffer, DynamicBufferDescriptor, DynamicBufferKind};
+use rtxel_gpu::{
+    ComputeBinding, Ctx, DynamicBuffer, DynamicBufferDescriptor, DynamicBufferKind,
+    StorageBuffer,
+};
 use wgpu::{BufferUsages, Texture, TextureFormat, TextureUsages};
 
-use crate::{BrickGrid, Frame, GpuBrickMap, GpuWorld, PipelineSet, RenderStartupSet};
+use crate::{
+    BrickGrid, Frame, GpuBrickMap, GpuPallete, GpuWorld, Material, MaterialManager, PipelineSet,
+    RenderStartupSet,
+};
+
+pub type MapBinding<const BINDING: usize, const WRITE: bool> =
+    ComputeBinding<BINDING, StorageBuffer<GpuBrickMap, WRITE>>;
+
+pub type GridBinding<const BINDING: usize, const WRITE: bool> =
+    ComputeBinding<BINDING, StorageBuffer<u32, WRITE>>;
+
+pub type MaterialBinding<const BINDING: usize, const WRITE: bool> =
+    ComputeBinding<BINDING, StorageBuffer<Material, WRITE>>;
+
+pub type PalleteBinding<const BINDING: usize, const WRITE: bool> =
+    ComputeBinding<BINDING, StorageBuffer<GpuPallete, WRITE>>;
 
 #[derive(Debug, Resource)]
 pub struct SharedResources {
     pub grid: DynamicBuffer<u32>,
     pub map: DynamicBuffer<GpuBrickMap>,
+    pub materials: DynamicBuffer<Material>,
+    pub palletes: DynamicBuffer<GpuPallete>,
     pub out_texture: Texture,
 
     pub is_dirty: bool,
@@ -35,6 +55,22 @@ impl SharedResources {
             map: DynamicBuffer::new(
                 DynamicBufferDescriptor {
                     label: Some("Map Dynamic Buffer".into()),
+                    usage: BufferUsages::STORAGE,
+                    kind: DynamicBufferKind::Storage,
+                },
+                ctx,
+            ),
+            materials: DynamicBuffer::new(
+                DynamicBufferDescriptor {
+                    label: Some("Material Dynamic Buffer".into()),
+                    usage: BufferUsages::STORAGE,
+                    kind: DynamicBufferKind::Storage,
+                },
+                ctx,
+            ),
+            palletes: DynamicBuffer::new(
+                DynamicBufferDescriptor {
+                    label: Some("Pallete Dynamic Buffer".into()),
                     usage: BufferUsages::STORAGE,
                     kind: DynamicBufferKind::Storage,
                 },
@@ -73,6 +109,7 @@ fn init(ctx: Res<Ctx>, mut commands: Commands) {
 fn extract(
     world: Res<GpuWorld>,
     grid: Res<BrickGrid>,
+    mut material_manager: ResMut<MaterialManager>,
     mut resources: ResMut<SharedResources>,
     mut frame: ResMut<Frame>,
     ctx: Res<Ctx>,
@@ -85,10 +122,24 @@ fn extract(
     }
 
     if resources
+        .palletes
+        .ensure_capacity(world.map_capacity(), frame.encoder_mut(), &ctx)
+    {
+        resources.is_dirty = true;
+    }
+
+    if resources
         .grid
         .ensure_capacity((grid.size as u64).pow(3), frame.encoder_mut(), &ctx)
     {
         resources.grid.mark_fully_used();
+        resources.is_dirty = true;
+    }
+
+    if material_manager.take_dirty() {
+        resources
+            .materials
+            .write(&material_manager.materials, frame.encoder_mut(), &ctx);
         resources.is_dirty = true;
     }
 }

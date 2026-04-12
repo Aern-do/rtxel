@@ -6,6 +6,9 @@ import world;
 public struct HitResult
 {
     public bool didHit;
+    public float3 normal;
+    public float3 pos;
+    public GpuMaterial material;
     public float t;
 };
 
@@ -13,6 +16,8 @@ public struct Traverser
 {
     public StructuredBuffer<uint> bricks;
     public StructuredBuffer<BrickMap> maps;
+    public StructuredBuffer<GpuMaterial> materials;
+    public StructuredBuffer<GpuPallete> palletes;
 
     public HitResult traverse(Ray ray)
     {
@@ -33,14 +38,31 @@ public struct Traverser
             if (brickMapIter.next(voxel))
             {
                 var brickHit = brickMapIter.hit();
+                var materialIdx = getMaterial(maps[brick - 1], brickHit.voxelPos);
 
                 result.didHit = true;
+                result.normal = brickHit.normal(ray.direction);
+                result.pos = ray.origin + ray.direction * brickHit.t;
+                result.material = materials[materialIdx];
                 result.t = brickHit.t;
                 return result;
             }
         }
 
         return result;
+    }
+
+    uint getMaterial(BrickMap map, int3 localPos)
+    {
+        uint idx = map.material_idx;
+
+        if (!map.isPallete(idx))
+        {
+            return idx - 1;
+        }
+
+        int voxelIndex = localPos.z * 64 + localPos.y * 8 + localPos.x;
+        return palletes[map.palleteIndex(idx)].data[voxelIndex] - 1;
     }
 }
 

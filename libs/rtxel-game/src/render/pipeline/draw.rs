@@ -5,28 +5,30 @@ use bevy_ecs::{
     system::{Commands, Query, Res, ResMut},
     world::World,
 };
-use log::info;
 use rtxel_core::{Plugin, Startup, WorldExt};
 use rtxel_gpu::{
-    AsBindGroup, BaseComputePipeline, Binding, Compute, Ctx, DynamicBuffer,
+    AsBindGroup, BaseComputePipeline, ComputeBinding, Ctx, DynamicBuffer,
     DynamicBufferDescriptor, DynamicBufferKind, Rgba32Float, UniformBuffer, WStorageTexture,
-    binding::RStorageBuffer,
 };
 use wgpu::{
-    BindGroup, BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline,
+    BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline,
     wgt::TextureViewDescriptor,
 };
 
 use crate::{
-    Camera, Frame, GpuBrickMap, PipelineSet, Player, RenderStartupSet, shared::SharedResources,
+    Camera, Frame, PipelineSet, Player, RenderStartupSet,
+    shared::{GridBinding, MapBinding, MaterialBinding, PalleteBinding, SharedResources},
 };
 
-type DrawBindGroup = Binding<0, Compute, UniformBuffer<Camera>>;
+type OutputTextureBinding<const IDX: usize> = ComputeBinding<IDX, WStorageTexture<Rgba32Float>>;
 
-type SharedBindGroup = (
-    Binding<0, Compute, RStorageBuffer<u32>>,
-    Binding<1, Compute, RStorageBuffer<GpuBrickMap>>,
-    Binding<2, Compute, WStorageTexture<Rgba32Float>>,
+type DrawBindGroup = (
+    ComputeBinding<0, UniformBuffer<Camera>>,
+    OutputTextureBinding<1>,
+    GridBinding<2, false>,
+    MapBinding<3, false>,
+    PalleteBinding<4, false>,
+    MaterialBinding<5, false>,
 );
 
 const DRAW_SHADER: &str = include_str!(env!("SHADER_draw"));
@@ -47,12 +49,7 @@ impl<S: ScheduleLabel> Plugin for DrawPipelinePlugin<S> {
             )
             .add_systems(
                 self.schedule.intern(),
-                (
-                    extract_camera,
-                    rebuild.run_if(|shared: Res<SharedResources>| shared.is_dirty),
-                )
-                    .chain()
-                    .in_set(PipelineSet::Extract),
+                extract_camera.in_set(PipelineSet::Extract),
             )
             .add_systems(self.schedule, dispatch.in_set(PipelineSet::Dispatch));
     }
@@ -61,17 +58,13 @@ impl<S: ScheduleLabel> Plugin for DrawPipelinePlugin<S> {
 #[derive(Debug, Resource)]
 pub struct DrawPipeline {
     pub pipeline: ComputePipeline,
+    pub bg_layout: BindGroupLayout,
 }
 
 impl DrawPipeline {
-    pub fn new(ctx: &Ctx, resources: &DrawResources) -> Self {
-        let layout = ctx.pipeline_layout(
-            Some("Draw Pipeline Layout"),
-            &[
-                Some(&resources.shared_bg_layout),
-                Some(&resources.bg_layout),
-            ],
-        );
+    pub fn new(ctx: &Ctx) -> Self {
+        let bg_layout = DrawBindGroup::layout(&ctx);
+        let layout = ctx.pipeline_layout(Some("Draw Pipeline Layout"), &[Some(&bg_layout)]);
 
         let pipeline = ctx
             .compute_pipeline(BaseComputePipeline {
@@ -82,25 +75,20 @@ impl DrawPipeline {
             .label("Draw Compute Pipeline")
             .build();
 
-        Self { pipeline }
+        Self {
+            pipeline,
+            bg_layout,
+        }
     }
 }
 
 #[derive(Debug, Resource)]
 pub struct DrawResources {
     pub camera: DynamicBuffer<Camera>,
-    pub bg: BindGroup,
-    pub bg_layout: BindGroupLayout,
-
-    pub shared_bg: BindGroup,
-    pub shared_bg_layout: BindGroupLayout,
-
-    pub width: u32,
-    pub height: u32,
 }
 
 impl DrawResources {
-    pub fn new(ctx: &Ctx, shared: &SharedResources, width: u32, height: u32) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         let camera = DynamicBuffer::new(
             DynamicBufferDescriptor {
                 label: Some("Camera Buffer".into()),
@@ -110,52 +98,16 @@ impl DrawResources {
             ctx,
         );
 
-        let bg_layout = DrawBindGroup::layout(ctx);
-        let bg = DrawBindGroup::bind_group(ctx, &bg_layout, camera.buffer());
-
-        let shared_bg_layout = SharedBindGroup::layout(ctx);
-        let shared_bg = Self::create_shared_bind_group(ctx, &shared_bg_layout, shared);
-
-        Self {
-            camera,
-            bg,
-            bg_layout,
-            shared_bg,
-            shared_bg_layout,
-            width,
-            height,
-        }
-    }
-
-    fn create_shared_bind_group(
-        ctx: &Ctx,
-        layout: &BindGroupLayout,
-        shared: &SharedResources,
-    ) -> BindGroup {
-        let view = shared
-            .out_texture
-            .create_view(&TextureViewDescriptor::default());
-
-        SharedBindGroup::bind_group(
-            ctx,
-            layout,
-            (shared.grid.buffer(), shared.map.buffer(), &view),
-        )
-    }
-
-    pub fn rebuild_shared_bind_group(&mut self, ctx: &Ctx, shared: &SharedResources) {
-        self.shared_bg = Self::create_shared_bind_group(ctx, &self.shared_bg_layout, shared);
+        Self { camera }
     }
 }
 
-fn init_resources(ctx: Res<Ctx>, shared: Res<SharedResources>, mut commands: Commands) {
-    let (width, height) = ctx.size();
-
-    commands.insert_resource(DrawResources::new(&ctx, &shared, width, height));
+fn init_resources(ctx: Res<Ctx>, mut commands: Commands) {
+    commands.insert_resource(DrawResources::new(&ctx));
 }
 
-fn init_pipeline(ctx: Res<Ctx>, resources: Res<DrawResources>, mut commands: Commands) {
-    commands.insert_resource(DrawPipeline::new(&ctx, &resources));
+fn init_pipeline(ctx: Res<Ctx>, mut commands: Commands) {
+    commands.insert_resource(DrawPipeline::new(&ctx));
 }
 
 fn extract_camera(
@@ -171,12 +123,29 @@ fn extract_camera(
         .write(&[*camera], frame.encoder_mut(), &ctx);
 }
 
-fn rebuild(ctx: Res<Ctx>, shared: Res<SharedResources>, mut res: ResMut<DrawResources>) {
-    res.rebuild_shared_bind_group(&ctx, &shared);
-    info!("draw shared bind group rebuilt");
-}
+fn dispatch(
+    mut frame: ResMut<Frame>,
+    pipeline: Res<DrawPipeline>,
+    resources: Res<DrawResources>,
+    shared_res: Res<SharedResources>,
+    ctx: Res<Ctx>,
+) {
+    let (width, height) = ctx.size();
+    let bg = DrawBindGroup::bind_group(
+        &ctx,
+        &pipeline.bg_layout,
+        (
+            resources.camera.buffer(),
+            &shared_res
+                .out_texture
+                .create_view(&TextureViewDescriptor::default()),
+            shared_res.grid.buffer(),
+            shared_res.map.buffer(),
+            shared_res.palletes.buffer(),
+            shared_res.materials.buffer(),
+        ),
+    );
 
-fn dispatch(mut frame: ResMut<Frame>, pipeline: Res<DrawPipeline>, resources: Res<DrawResources>) {
     let encoder = frame.encoder_mut();
     {
         let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
@@ -184,11 +153,10 @@ fn dispatch(mut frame: ResMut<Frame>, pipeline: Res<DrawPipeline>, resources: Re
             timestamp_writes: None,
         });
         pass.set_pipeline(&pipeline.pipeline);
-        pass.set_bind_group(0, &resources.shared_bg, &[]);
-        pass.set_bind_group(1, &resources.bg, &[]);
+        pass.set_bind_group(0, &bg, &[]);
 
-        let workgroups_x = resources.width.div_ceil(WORKGROUP_SIZE);
-        let workgroups_y = resources.height.div_ceil(WORKGROUP_SIZE);
+        let workgroups_x = width.div_ceil(WORKGROUP_SIZE);
+        let workgroups_y = height.div_ceil(WORKGROUP_SIZE);
         pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
     }
 }

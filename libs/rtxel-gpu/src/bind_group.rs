@@ -53,6 +53,8 @@ impl Visibility for VertexFragment {
 
 pub struct Binding<const IDX: usize, V, B>(PhantomData<(V, B)>);
 
+pub type ComputeBinding<const IDX: usize, B> = Binding<IDX, Compute, B>;
+
 pub trait AsBindGroup {
     type Resources<'res>;
 
@@ -158,4 +160,5 @@ impl_as_bind_group! {
     A B C;
     A B C D;
     A B C D E;
+    A B C D E F;
 }

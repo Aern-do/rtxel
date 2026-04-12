@@ -11,12 +11,12 @@ use wgpu::{CommandEncoder, CommandEncoderDescriptor, CurrentSurfaceTexture, Surf
 
 pub mod gpu_world;
 pub mod pipeline;
-pub mod resources;
 pub mod slot_allocator;
+pub mod command;
 pub use gpu_world::*;
 pub use pipeline::*;
-pub use resources::*;
 pub use slot_allocator::*;
+pub use command::*;
 
 #[derive(Debug, Default, Resource)]
 pub struct Frame {
