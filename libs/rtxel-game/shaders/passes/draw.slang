@@ -41,9 +41,28 @@ float3 traverse(Ray ray) {
     var gridVolume = BrickGridVolume(configuration, grid);
     var traverser = Traverser(gridVolume, bricks, materials, palletes);
 
+    float angle = float(camera.frame_count) * 0.00025;
+    var sun = normalize(float3(cos(angle), 0.4, sin(angle)));
+    
     var hit = traverser.traverse(ray);
     if (hit.didHit()) {
-        return hit.material.color;
+        var sunRay = Ray(hit.hitInfo.entry(ray) + 1e-3, sun);
+        var sunHit = traverser.traverse(sunRay);
+
+        if (sunHit.didHit()) {
+            return hit.material.color * 0.25;
+        } else {
+            return hit.material.color;
+        }
+    } else {
+        var sunColor = smoothstep(0.975, 0.985, dot(normalize(ray.direction), normalize(sun)));
+        var skyStartColor = float3(0.2, 0.6, 1.0);
+        var skyEndColor = float3(0.0, 0.5, 1.0);
+
+        var skyColor = lerp(skyStartColor, skyEndColor, ray.direction.y);
+
+        var result = skyColor + sunColor;
+        return result / (result + float3(1.0));
     }
 
     return float3(0.0);
