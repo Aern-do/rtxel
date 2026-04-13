@@ -52,14 +52,18 @@ impl BrickGrid {
 
         let grid_idx = self.brick_idx(brick_pos);
         let brick = &mut self.grid[grid_idx];
-        brick.set(local_pos, material);
+        if material == MaterialId::AIR {
+            brick.clear(local_pos);
+        } else {
+            brick.set(local_pos, material);
+        }
 
         Edit::Set {
             grid_idx,
             brick: *brick,
         }
     }
-    
+
     fn brick_in_bounds(&self, brick_pos: IVec3) -> bool {
         let half = self.size as i32 / 2;
         brick_pos.cmpge(IVec3::splat(-half)).all() && brick_pos.cmplt(IVec3::splat(half)).all()

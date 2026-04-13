@@ -68,11 +68,11 @@ public struct Traverser {
     public StructuredBuffer<Material> materials;
     public StructuredBuffer<Pallete> palletes;
 
-    public VoxelHitInfo traverse(Ray ray) {
+    public VoxelHitInfo traverse(Ray ray, int maxGridSteps = 128, int maxMapSteps = 64) {
         var result = VoxelHitInfo();
 
         var grid = gridVolume.grid();
-        var gridDDA = DDA(grid, ray, int(pow(grid.size, 3)));
+        var gridDDA = DDA(grid, ray, maxGridSteps);
 
         int3 gridPos;
         while (gridDDA.next(gridPos)) {
@@ -82,7 +82,7 @@ public struct Traverser {
 
             var hit = gridDDA.hit();
             var map = BrickMapVolume(hit.voxelAABB, bricks[brick - 1].mask);
-            var mapDDA = DDA(map.grid(), ray, 8 * 8 * 8);
+            var mapDDA = DDA(map.grid(), ray, maxMapSteps);
 
             int3 innerPos;
             while (mapDDA.next(innerPos)) {

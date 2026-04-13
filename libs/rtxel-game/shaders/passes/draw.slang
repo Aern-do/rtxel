@@ -50,7 +50,7 @@ float3 traverse(Ray ray) {
         var sunHit = traverser.traverse(sunRay);
 
         float highlight =
-            (cos(float(camera.frame_count) * 0.025) * 0.5 + 0.5) * 0.3;
+            (cos(float(camera.frame_count) * 0.05) * 0.5 + 0.5) * 0.3;
         var color = hit.material.color;
         if (all(hit.pos == camera.target_block)) {
             color += highlight;
