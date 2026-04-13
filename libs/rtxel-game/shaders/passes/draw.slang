@@ -50,9 +50,9 @@ float3 traverse(Ray ray) {
         var sunHit = traverser.traverse(sunRay);
 
         if (sunHit.didHit()) {
-            return hit.material.color * 0.25;
+            return hit.material.color * 0.25 * hit.tint;
         } else {
-            return hit.material.color;
+            return hit.material.color * hit.tint;
         }
     } else {
         var sunColor = smoothstep(0.975, 0.985, dot(normalize(ray.direction), normalize(sun)));

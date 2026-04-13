@@ -7,11 +7,12 @@ use glam::Vec3;
 #[derive(Debug, Clone, Copy, ShaderType)]
 pub struct Material {
     pub color: Vec3,
+    pub transparency: f32,
 }
 
 impl Material {
-    pub fn new(color: Vec3) -> Self {
-        Self { color, }
+    pub fn new(color: Vec3, transparency: f32) -> Self {
+        Self { color, transparency }
     }
 }
 

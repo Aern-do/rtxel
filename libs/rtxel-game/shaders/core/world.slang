@@ -25,4 +25,5 @@ public typealias Pallete = Array<uint, 512>;
 
 public struct Material {
     public float3 color;
+    public float transparency;
 }

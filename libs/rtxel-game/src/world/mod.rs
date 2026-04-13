@@ -42,13 +42,13 @@ pub struct DefaultMaterials {
 
 fn create_materials(mut manager: ResMut<MaterialManager>, mut commands: Commands) {
     commands.insert_resource(DefaultMaterials {
-        dirt: manager.register(Material::new(Vec3::new(0.55, 0.36, 0.17))),
-        grass: manager.register(Material::new(Vec3::new(0.30, 0.65, 0.15))),
-        stone: manager.register(Material::new(Vec3::new(0.50, 0.50, 0.52))),
-        sand: manager.register(Material::new(Vec3::new(0.90, 0.85, 0.60))),
-        snow: manager.register(Material::new(Vec3::new(0.95, 0.96, 0.98))),
-        water: manager.register(Material::new(Vec3::new(0.15, 0.35, 0.75))),
-        gravel: manager.register(Material::new(Vec3::new(0.60, 0.58, 0.55))),
+        dirt: manager.register(Material::new(Vec3::new(0.55, 0.36, 0.17), 0.0)),
+        grass: manager.register(Material::new(Vec3::new(0.30, 0.65, 0.15), 0.0)),
+        stone: manager.register(Material::new(Vec3::new(0.50, 0.50, 0.52), 0.0)),
+        sand: manager.register(Material::new(Vec3::new(0.90, 0.85, 0.60), 0.0)),
+        snow: manager.register(Material::new(Vec3::new(0.95, 0.96, 0.98), 0.0)),
+        water: manager.register(Material::new(Vec3::new(0.6, 0.8, 1.0), 0.25)),
+        gravel: manager.register(Material::new(Vec3::new(0.60, 0.58, 0.55), 0.0)),
     });
 }
 

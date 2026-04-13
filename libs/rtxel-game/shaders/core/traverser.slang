@@ -11,6 +11,7 @@ uint flatten(int3 pos, int size) {
 public struct VoxelHitInfo {
     public HitInfo hitInfo;
     public float3 normal;
+    public float3 tint = 1.0;
     public Material material;
 
     public bool didHit() { return hitInfo.hit; }
@@ -90,9 +91,16 @@ public struct Traverser {
 
                 var innerHit = mapDDA.hit();
                 var materialIdx = getMaterial(bricks[brick - 1], innerPos);
+                var material = materials[materialIdx];
+
+                if (material.transparency > 0.0) {
+                    result.tint *= material.color;
+                    continue;
+                }
+
                 result.hitInfo = innerHit.hitInfo;
                 result.normal = innerHit.normal(ray);
-                result.material = materials[materialIdx];
+                result.material = material;
                 return result;
             }
         }
