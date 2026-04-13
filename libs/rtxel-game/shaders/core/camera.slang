@@ -11,6 +11,8 @@ public struct Camera {
   public float fov;
 
   public uint frame_count;
+  public int3 target_block;
+  public int pad;
 
   public Ray createRay(float2 uv) {
     float2 ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);

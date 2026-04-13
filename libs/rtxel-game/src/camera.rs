@@ -6,7 +6,7 @@ use bevy_ecs::{
     world::World,
 };
 use encase::ShaderType;
-use glam::Vec3;
+use glam::{IVec3, Vec3};
 use rtxel_core::{
     DeltaTime, KeyCode, Keyboard, MouseMotion, Plugin, Startup, Update, WindowHandle, WorldExt,
 };
@@ -26,6 +26,8 @@ pub struct Camera {
     pub fov: f32,
 
     pub frame_count: u32,
+    pub target_block: IVec3,
+    pub pad: i32,
 }
 
 impl Camera {
@@ -82,6 +84,8 @@ fn setup_camera(window: Res<WindowHandle>, mut commands: Commands) {
         yaw: 90.0,
         pitch: 0.0,
         frame_count: 0,
+        target_block: IVec3::splat(0),
+        pad: 0
     };
     camera.update_vectors();
 

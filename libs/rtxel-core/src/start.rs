@@ -10,7 +10,7 @@ use winit::{
 };
 
 use crate::{
-    CorePlugin, DeltaTime, KeyPress, MouseMotion, Order, Startup, WindowHandle, world_ext::WorldExt,
+    CorePlugin, DeltaTime, KeyPress, MouseMotion, MousePress, Order, Startup, WindowHandle, world_ext::WorldExt
 };
 
 #[derive(Debug)]
@@ -83,6 +83,10 @@ impl<F: Fn(&mut World, Window)> ApplicationHandler for Init<F> {
                     })
                 }
             }
+            WindowEvent::MouseInput { state, button, .. } => world.trigger(MousePress {
+                button,
+                release: state == ElementState::Released,
+            }),
             _ => {}
         }
     }

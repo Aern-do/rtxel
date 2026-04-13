@@ -59,6 +59,29 @@ impl BrickGrid {
             brick: *brick,
         }
     }
+    
+    fn brick_in_bounds(&self, brick_pos: IVec3) -> bool {
+        let half = self.size as i32 / 2;
+        brick_pos.cmpge(IVec3::splat(-half)).all() && brick_pos.cmplt(IVec3::splat(half)).all()
+    }
+
+    pub fn get_voxel(&self, pos: IVec3) -> Option<MaterialId> {
+        let brick_size = BrickMap::SIZE as i32;
+        let brick_pos = pos.div_euclid(IVec3::splat(brick_size));
+
+        if !self.brick_in_bounds(brick_pos) {
+            return None;
+        }
+
+        let local_pos = pos.rem_euclid(IVec3::splat(brick_size)).as_uvec3();
+        let brick = self.brick(brick_pos);
+
+        if brick.get(local_pos) {
+            Some(brick.get_material(local_pos))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

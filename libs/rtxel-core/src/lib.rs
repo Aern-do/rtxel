@@ -1,11 +1,12 @@
 pub mod keyboard;
+pub mod mouse;
 pub mod schedule;
 pub mod start;
 pub mod window;
 pub mod world_ext;
-
 use bevy_ecs::world::World;
 pub use keyboard::*;
+pub use mouse::*;
 pub use schedule::*;
 pub use start::*;
 pub use window::*;
@@ -27,5 +28,6 @@ impl Plugin for CorePlugin {
             window: self.window,
         });
         world.add_plugin(KeyboardPlugin);
+        world.add_plugin(MousePlugin);
     }
 }

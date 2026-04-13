@@ -43,19 +43,27 @@ float3 traverse(Ray ray) {
 
     float angle = float(camera.frame_count) * 0.00025;
     var sun = normalize(float3(cos(angle), 0.4, sin(angle)));
-    
+
     var hit = traverser.traverse(ray);
     if (hit.didHit()) {
         var sunRay = Ray(hit.hitInfo.entry(ray) + 1e-3, sun);
         var sunHit = traverser.traverse(sunRay);
 
+        float highlight =
+            (cos(float(camera.frame_count) * 0.025) * 0.5 + 0.5) * 0.3;
+        var color = hit.material.color;
+        if (all(hit.pos == camera.target_block)) {
+            color += highlight;
+        }
+
         if (sunHit.didHit()) {
-            return hit.material.color * 0.25 * hit.tint;
+            return color * 0.25 * hit.tint;
         } else {
-            return hit.material.color * hit.tint;
+            return color * hit.tint;
         }
     } else {
-        var sunColor = smoothstep(0.975, 0.985, dot(normalize(ray.direction), normalize(sun)));
+        var sunColor = smoothstep(
+            0.975, 0.985, dot(normalize(ray.direction), normalize(sun)));
         var skyStartColor = float3(0.2, 0.6, 1.0);
         var skyEndColor = float3(0.0, 0.5, 1.0);
 

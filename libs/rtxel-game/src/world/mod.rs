@@ -1,22 +1,24 @@
 use bevy_ecs::{
+    query::With,
     resource::Resource,
     schedule::IntoScheduleConfigs,
-    system::{Commands, Res, ResMut},
+    system::{Commands, Query, Res, ResMut},
     world::World,
 };
-use glam::{Vec3, ivec3};
+use glam::{IVec3, Vec3, ivec3};
 use log::info;
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
-use rtxel_core::{Plugin, Startup, WorldExt};
+use rtxel_core::{Mouse, MouseButton, Plugin, Startup, Update, WorldExt};
 
 pub mod brick_grid;
+pub mod dda;
 pub mod material;
 pub mod voxel;
 pub use brick_grid::*;
 pub use material::*;
 pub use voxel::*;
 
-use crate::GpuWorld;
+use crate::{Camera, GpuWorld, Player, dda::Raycast};
 
 pub struct WorldPlugin;
 
@@ -26,6 +28,36 @@ impl Plugin for WorldPlugin {
         world.init_resource::<MaterialManager>();
 
         world.add_systems(Startup, (create_materials, generate).chain());
+        world.add_systems(Update, edit_block);
+    }
+}
+
+fn edit_block(
+    mouse: Res<Mouse>,
+    materials: Res<DefaultMaterials>,
+    mut world: ResMut<GpuWorld>,
+    mut camera: Query<&mut Camera, With<Player>>,
+    mut grid: ResMut<BrickGrid>,
+) {
+    let mut camera = camera.single_mut().expect("no camera");
+    let raycast = Raycast { grid: &grid };
+
+    let Some(hit) = raycast.raycast(camera.origin, camera.forward, 64.0) else {
+        camera.target_block = IVec3::splat(0);
+        return;
+    };
+
+    camera.target_block = hit.pos;
+
+    if mouse.just_pressed(MouseButton::Left) {
+        let edit = grid.set_voxel(hit.pos, MaterialId::AIR);
+        world.apply(edit);
+    }
+
+        if mouse.just_pressed(MouseButton::Right) {
+        let place_pos = hit.pos + hit.normal;
+        let edit = grid.set_voxel(place_pos, materials.stone);
+        world.apply(edit);
     }
 }
 

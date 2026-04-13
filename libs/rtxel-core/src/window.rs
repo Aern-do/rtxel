@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bevy_ecs::{event::Event, resource::Resource, world::World};
-use winit::{keyboard::KeyCode, window::Window};
+use winit::{event::MouseButton, keyboard::KeyCode, window::Window};
 
 use crate::Plugin;
 
@@ -20,10 +20,17 @@ pub struct MouseMotion {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Event)]
+pub struct MousePress {
+    pub button: MouseButton,
+    pub release: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Event)]
 pub struct KeyPress {
     pub key: KeyCode,
     pub release: bool,
 }
+
 
 #[derive(Debug, Default, Resource, Clone, Copy)]
 pub struct DeltaTime {

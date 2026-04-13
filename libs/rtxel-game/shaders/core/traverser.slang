@@ -12,6 +12,7 @@ public struct VoxelHitInfo {
     public HitInfo hitInfo;
     public float3 normal;
     public float3 tint = 1.0;
+    public int3 pos;
     public Material material;
 
     public bool didHit() { return hitInfo.hit; }
@@ -101,6 +102,7 @@ public struct Traverser {
                 result.hitInfo = innerHit.hitInfo;
                 result.normal = innerHit.normal(ray);
                 result.material = material;
+                result.pos = int3(innerHit.voxelAABB.min_);
                 return result;
             }
         }
