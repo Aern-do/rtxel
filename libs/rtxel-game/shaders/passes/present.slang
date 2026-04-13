@@ -10,6 +10,7 @@ SamplerState inputSampler;
 
 [shader("vertex")]
 VertexOutput vs_main(uint vertexId : SV_VertexID) {
+    // I've stole this from somewhere, but I have no fucking clue from where
     float x = float(int(vertexId & 1u)) * 4.0 - 1.0;
     float y = float(int(vertexId >> 1u)) * 4.0 - 1.0;
 

@@ -5,10 +5,11 @@ use bevy_ecs::{
     system::{Commands, Query, Res, ResMut},
     world::World,
 };
+use encase::ShaderType;
 use rtxel_core::{Plugin, Startup, WorldExt};
 use rtxel_gpu::{
-    AsBindGroup, BaseComputePipeline, ComputeBinding, Ctx, DynamicBuffer,
-    DynamicBufferDescriptor, DynamicBufferKind, Rgba32Float, UniformBuffer, WStorageTexture,
+    AsBindGroup, BaseComputePipeline, ComputeBinding, Ctx, DynamicBuffer, DynamicBufferDescriptor,
+    DynamicBufferKind, Rgba32Float, UniformBuffer, WStorageTexture,
 };
 use wgpu::{
     BindGroupLayout, BufferUsages, ComputePassDescriptor, ComputePipeline,
@@ -16,19 +17,28 @@ use wgpu::{
 };
 
 use crate::{
-    Camera, Frame, PipelineSet, Player, RenderStartupSet,
+    BrickGrid, Camera, Frame, PipelineSet, Player, RenderStartupSet,
     shared::{GridBinding, MapBinding, MaterialBinding, PalleteBinding, SharedResources},
 };
+
+#[derive(Debug, Default, Clone, Copy, ShaderType)]
+pub struct GridConfiguration {
+    pub size: i32,
+    pub _pad0: i32,
+    pub _pad1: i32,
+    pub _pad2: i32,
+}
 
 type OutputTextureBinding<const IDX: usize> = ComputeBinding<IDX, WStorageTexture<Rgba32Float>>;
 
 type DrawBindGroup = (
     ComputeBinding<0, UniformBuffer<Camera>>,
-    OutputTextureBinding<1>,
-    GridBinding<2, false>,
-    MapBinding<3, false>,
-    PalleteBinding<4, false>,
-    MaterialBinding<5, false>,
+    ComputeBinding<1, UniformBuffer<GridConfiguration>>,
+    OutputTextureBinding<2>,
+    GridBinding<3, false>,
+    MapBinding<4, false>,
+    PalleteBinding<5, false>,
+    MaterialBinding<6, false>,
 );
 
 const DRAW_SHADER: &str = include_str!(env!("SHADER_draw"));
@@ -85,6 +95,7 @@ impl DrawPipeline {
 #[derive(Debug, Resource)]
 pub struct DrawResources {
     pub camera: DynamicBuffer<Camera>,
+    pub configuration: DynamicBuffer<GridConfiguration>,
 }
 
 impl DrawResources {
@@ -98,7 +109,19 @@ impl DrawResources {
             ctx,
         );
 
-        Self { camera }
+        let configuration = DynamicBuffer::new(
+            DynamicBufferDescriptor {
+                label: Some("Configuration Buffer".into()),
+                usage: BufferUsages::UNIFORM,
+                kind: DynamicBufferKind::Uniform,
+            },
+            ctx,
+        );
+
+        Self {
+            camera,
+            configuration,
+        }
     }
 }
 
@@ -113,6 +136,7 @@ fn init_pipeline(ctx: Res<Ctx>, mut commands: Commands) {
 fn extract_camera(
     camera: Query<&Camera, With<Player>>,
     ctx: Res<Ctx>,
+    grid: Res<BrickGrid>,
     mut resources: ResMut<DrawResources>,
     mut frame: ResMut<Frame>,
 ) {
@@ -121,6 +145,15 @@ fn extract_camera(
     resources
         .camera
         .write(&[*camera], frame.encoder_mut(), &ctx);
+
+    resources.configuration.write(
+        &[GridConfiguration {
+            size: grid.size as i32,
+            ..Default::default()
+        }],
+        frame.encoder_mut(),
+        &ctx,
+    );
 }
 
 fn dispatch(
@@ -136,6 +169,7 @@ fn dispatch(
         &pipeline.bg_layout,
         (
             resources.camera.buffer(),
+            resources.configuration.buffer(),
             &shared_res
                 .out_texture
                 .create_view(&TextureViewDescriptor::default()),

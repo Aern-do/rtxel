@@ -1,14 +1,15 @@
-public struct VolumeConfig {
-    public int size;
+public struct Grid {
     public float3 min;
     public float3 max;
-};
+    public int size;
 
-public interface IVolume {
-    associatedtype Voxel;
+    public float3 voxels_per_unit() { return size / (max - min); }
+}
 
-    public VolumeConfig config();
-    
+public interface Volume {
+    public associatedtype Voxel;
+    public Grid grid();
+
     public Voxel get(int3 pos);
     public bool shouldSkip(Voxel voxel);
 }
