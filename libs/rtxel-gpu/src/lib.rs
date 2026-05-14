@@ -1,4 +1,7 @@
-use std::{env, sync::Mutex};
+use std::{
+    env,
+    sync::{Mutex, RwLock, RwLockReadGuard},
+};
 
 use log::info;
 use wgpu::{
@@ -11,7 +14,7 @@ use wgpu::{
 pub struct Ctx {
     pub device: Device,
     pub queue: Queue,
-    pub config: Mutex<SurfaceConfiguration>,
+    pub config: RwLock<SurfaceConfiguration>,
     pub surface: Surface<'static>,
 }
 
@@ -67,8 +70,18 @@ impl Ctx {
         Self {
             device,
             queue,
-            config: Mutex::new(config),
+            config: RwLock::new(config),
             surface,
         }
+    }
+
+    /// Returns current [surface configuration](wgpu::SurfaceConfiguration)
+    pub fn config(&self) -> RwLockReadGuard<'_, SurfaceConfiguration> {
+        self.config.read().expect("failed to read config")
+    }
+
+    /// Reconfigures surface using current [surface configuration](wgpu::SurfaceConfiguration)
+    pub fn reconfigure(&self) {
+        self.surface.configure(&self.device, &self.config());
     }
 }

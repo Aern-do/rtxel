@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use log::warn;
 use rtxel_gpu::Ctx;
 use winit::{
     event::WindowEvent,
@@ -7,12 +8,15 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{Event, Start};
+use crate::{
+    Event, Start,
+    render::{FailedFrame, Frame},
+};
 
 #[derive(Debug)]
 pub struct Engine {
     pub window: Arc<Window>,
-    pub ctx: Ctx,
+    pub ctx: Arc<Ctx>,
 }
 
 impl Engine {
@@ -22,10 +26,26 @@ impl Engine {
         let size = window.inner_size();
         let ctx = pollster::block_on(Ctx::new(window.clone(), size.width, size.height));
 
-        Self { window, ctx }
+        Self {
+            window,
+            ctx: Arc::new(ctx),
+        }
     }
 
-    pub fn on_redraw(&mut self) {}
+    pub fn on_redraw(&mut self) {
+        let frame = match Frame::begin(&self.ctx) {
+            Ok(frame) => frame,
+            Err(FailedFrame::Skip) => return,
+            Err(FailedFrame::Outdated) => {
+                warn!("surface is outdated, reconfiguration was required");
+                self.ctx.reconfigure();
+                return;
+            }
+            Err(FailedFrame::Critical) => panic!("critical error when trying to begin new frame"),
+        };
+
+        frame.present(&self.ctx, &self.window);
+    }
 }
 
 pub fn start() {
