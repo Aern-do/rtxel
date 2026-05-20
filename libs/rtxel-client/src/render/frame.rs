@@ -1,6 +1,5 @@
 use rtxel_gpu::Ctx;
 use wgpu::{CommandEncoder, CurrentSurfaceTexture, SurfaceTexture, wgt::CommandEncoderDescriptor};
-use winit::window::Window;
 
 /// An error returned by [`Frame::begin`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,10 +42,8 @@ impl Frame {
     }
 
     /// Present a frame
-    pub fn present(self, ctx: &Ctx, window: &Window) {
+    pub fn present(self, ctx: &Ctx) {
         ctx.queue.submit(Some(self.encoder.finish()));
-        window.pre_present_notify();
         self.surface.present();
-        window.request_redraw();
     }
 }

@@ -1,0 +1,30 @@
+public struct Map<let N : uint> {
+    public static const uint SIZE = N;
+    public static const uint VOLUME = N * N * N;
+    public static const uint WORDS = (N * N * N + 31) / 32;
+
+    public typealias Mask = Array<uint, WORDS>;
+
+    Mask mask;
+}
+
+public typealias Map8 = Map<8>;
+public typealias Map4 = Map<4>;
+public typealias Map2 = Map<2>;
+
+public struct GridCell {
+    uint raw;
+    __init(uint value) { raw = value; }
+
+    public static GridCell unloaded() { return GridCell(0); }
+    public static GridCell empty() { return GridCell(1); }
+    public static GridCell map(uint ptr) { return GridCell(ptr + 2); }
+
+    bool isUnloaded() { return raw == 0; }
+    bool isEmpty() { return raw == 1; }
+    bool isMap() { return raw >= 2; }
+
+    property uint ptr {
+        get { return raw - 2; }
+    }
+}

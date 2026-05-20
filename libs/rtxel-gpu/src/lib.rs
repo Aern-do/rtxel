@@ -1,13 +1,22 @@
+pub mod bind_group;
+pub mod binding;
+pub mod compute_pipeline;
 use std::{
     env,
-    sync::{Mutex, RwLock, RwLockReadGuard},
+    sync::{RwLock, RwLockReadGuard},
 };
 
+pub use bind_group::{AsBindGroup, Bind, ImplicitBindGroupLayoutEntry};
+pub use binding::*;
+use bytemuck::{NoUninit, checked::cast_slice};
+pub use compute_pipeline::{BaseComputePipeline, ComputePipelineBuilder};
 use log::info;
 use wgpu::{
-    BackendOptions, Backends, Device, Instance, InstanceDescriptor, InstanceFlags, Limits,
-    MemoryBudgetThresholds, PowerPreference, PresentMode, Queue, RequestAdapterOptionsBase,
-    Surface, SurfaceConfiguration, SurfaceTarget, Trace, wgt::DeviceDescriptor,
+    BackendOptions, Backends, Buffer, BufferUsages, Device, Instance, InstanceDescriptor,
+    InstanceFlags, Limits, MemoryBudgetThresholds, PowerPreference, PresentMode, Queue,
+    RequestAdapterOptionsBase, Surface, SurfaceConfiguration, SurfaceTarget, Trace,
+    util::{BufferInitDescriptor, DeviceExt},
+    wgt::{BufferDescriptor, DeviceDescriptor},
 };
 
 #[derive(Debug)]
@@ -83,5 +92,42 @@ impl Ctx {
     /// Reconfigures surface using current [surface configuration](wgpu::SurfaceConfiguration)
     pub fn reconfigure(&self) {
         self.surface.configure(&self.device, &self.config());
+    }
+
+    /// Creates a [Buffer] with data to initalize it
+    pub fn create_buffer_init<T: NoUninit>(
+        &self,
+        contents: &[T],
+        label: Option<&str>,
+        usage: BufferUsages,
+    ) -> Buffer {
+        self.device.create_buffer_init(&BufferInitDescriptor {
+            label,
+            contents: cast_slice(contents),
+            usage,
+        })
+    }
+
+    /// Creates a [Buffer] with given size
+    pub fn create_buffer<T>(
+        &self,
+        size: usize,
+        label: Option<&str>,
+        usage: BufferUsages,
+    ) -> Buffer {
+        self.device.create_buffer(&BufferDescriptor {
+            label,
+            size: (size * size_of::<T>()) as u64,
+            usage,
+            mapped_at_creation: false,
+        })
+    }
+
+    /// Create a compute pipeline builder with given base pipeline
+    pub fn compute_pipeline<'ctx, 'pl>(
+        &'ctx self,
+        base: BaseComputePipeline<'pl>,
+    ) -> ComputePipelineBuilder<'ctx, 'pl> {
+        ComputePipelineBuilder::new(base, self)
     }
 }

@@ -7,6 +7,8 @@ edition = "2024"
 rtxel-gpu = { workspace = true }
 wgpu = { workspace = true }
 log = { workspace = true }
+bytemuck = { workspace = true }
+glam = "0.32.1"
 winit = "0.30.13"
 pollster = "0.4.0"
 env_logger = "0.11.10"
