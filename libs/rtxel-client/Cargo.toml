@@ -8,7 +8,7 @@ rtxel-gpu = { workspace = true }
 wgpu = { workspace = true }
 log = { workspace = true }
 bytemuck = { workspace = true }
-glam = "0.32.1"
+glam = { version = "0.32.1", features = ["bytemuck"] }
 winit = "0.30.13"
 pollster = "0.4.0"
 env_logger = "0.11.10"
