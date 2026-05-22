@@ -114,6 +114,10 @@ impl Unpack {
         }
     }
 
+    pub fn queue_size(&self) -> usize {
+        self.pending_commands.len()
+    }
+
     /// Dispatch unpack pass
     pub fn dispatch(&mut self, gpu_world: &GPUWorld, frame: &mut Frame) {
         if self.pending_commands.is_empty() {

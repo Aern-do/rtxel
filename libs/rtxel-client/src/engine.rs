@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use glam::USizeVec3;
+use glam::{USizeVec3, Vec3};
 use log::warn;
 use rtxel_gpu::Ctx;
 use winit::{
@@ -12,11 +12,10 @@ use winit::{
 
 use crate::{
     Camera, Event, Keyboard, Start,
-    render::{FailedFrame, Frame, Render},
+    render::{FailedFrame, Frame, Render, debug::DebugInformation},
     world::{World, generator::generate},
 };
 
-#[derive(Debug)]
 pub struct Engine {
     pub window: Arc<Window>,
     pub ctx: Arc<Ctx>,
@@ -29,9 +28,16 @@ pub struct Engine {
     pub skipped_frames: usize,
     pub last_frame: Instant,
     pub dt: f32,
+    pub camera_preset: usize,
 }
 
 impl Engine {
+    const CAMERA_PRESETS: &[(Vec3, f32, f32)] = &[
+        (Vec3::new(123.0, -18.0, 403.0), -91.2, -13.0),
+        (Vec3::new(-128.0, -100.0, -195.0), -264.8, -26.4),
+        (Vec3::new(124.0, 239.0, -858.0), -264.8, -26.4),
+    ];
+
     pub fn new(window: Window) -> Self {
         let window = Arc::new(window);
         let size = window.inner_size();
@@ -44,7 +50,7 @@ impl Engine {
         let mut world = World::new(USizeVec3::new(128, 128, 128));
 
         let camera = Camera::new(size.width as f32 / size.height as f32);
-        let render = Render::new(&world, camera, &window, ctx.clone());
+        let render = Render::new(&world, camera, window.clone(), ctx.clone());
 
         generate(&mut world);
         world.emit_all_edits();
@@ -59,6 +65,7 @@ impl Engine {
             skipped_frames: 0,
             last_frame: Instant::now(),
             dt: 0.0,
+            camera_preset: 0,
         }
     }
 
@@ -68,8 +75,10 @@ impl Engine {
             None => return,
         };
 
-        self.tick();
-        self.render.run(&mut frame, &self.window);
+        let mut debug_info = DebugInformation::default();
+
+        self.tick(&mut debug_info);
+        self.render.run(&mut frame, &self.window, debug_info);
 
         self.window.pre_present_notify();
         frame.present(&self.ctx);
@@ -96,7 +105,7 @@ impl Engine {
         }
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, debug_info: &mut DebugInformation) {
         self.window
             .set_cursor_grab(CursorGrabMode::Locked)
             .expect("failed to lock mouse");
@@ -104,12 +113,25 @@ impl Engine {
         self.dt = now.duration_since(self.last_frame).as_secs_f32();
         self.last_frame = now;
 
+        debug_info.dt = self.dt;
+
         self.camera.frame += 1;
         self.camera.update_keyboard(&self.keyboard, self.dt);
 
         self.render.apply_edits(self.world.drain_edits());
+        self.render.update_debug_info(debug_info);
         self.render.update_camera(&self.camera);
         self.render.update_render_data(&self.world);
+
+        if self.keyboard.just_pressed(KeyCode::KeyP) {
+            let (origin, yaw, pitch) = Self::CAMERA_PRESETS[self.camera_preset];
+            self.camera.origin = origin;
+            self.camera.yaw = yaw;
+            self.camera.pitch = pitch;
+            self.camera.update_vectors();
+            self.camera.frame = 0;
+            self.camera_preset = (self.camera_preset + 1) % Self::CAMERA_PRESETS.len();
+        }
         self.keyboard.clear();
     }
 

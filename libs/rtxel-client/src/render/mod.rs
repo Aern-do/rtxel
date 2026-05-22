@@ -1,6 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 pub mod compile;
+pub mod debug;
 pub mod draw;
 pub mod frame;
 pub mod gpu_world;
@@ -24,7 +25,10 @@ use winit::window::Window;
 
 use crate::{
     Camera,
-    render::draw::Draw,
+    render::{
+        debug::{Debug, DebugDispatch, DebugInformation},
+        draw::Draw,
+    },
     world::{Edit, World},
 };
 
@@ -36,12 +40,12 @@ pub struct RenderData {
     pub frame: u32,
 }
 
-#[derive(Debug)]
 pub struct Render {
     pub world: GPUWorld,
     pub unpack: Unpack,
     pub present: Present,
     pub draw: Draw,
+    pub debug: Debug,
 
     pub camera_buffer: Buffer,
     pub render_data_buffer: Buffer,
@@ -53,7 +57,7 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new(world: &World, camera: Camera, window: &Window, ctx: Arc<Ctx>) -> Self {
+    pub fn new(world: &World, camera: Camera, window: Arc<Window>, ctx: Arc<Ctx>) -> Self {
         let base_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("shaders");
         let compiler = Compiler::new(ctx.clone(), base_path);
 
@@ -109,6 +113,7 @@ impl Render {
             unpack: Unpack::create(ctx.clone(), &compiler),
             draw: Draw::new(ctx.clone(), &compiler),
             present: Present::new(ctx.clone(), &compiler),
+            debug: Debug::new(window, ctx.clone()),
             camera_buffer,
             render_data_buffer,
             out_texture,
@@ -116,6 +121,10 @@ impl Render {
             ctx,
             frame: 0,
         }
+    }
+
+    pub fn update_debug_info(&self, debug_info: &mut DebugInformation) {
+        debug_info.dispatch_queue = self.unpack.queue_size();
     }
 
     /// Update camera buffer
@@ -144,7 +153,7 @@ impl Render {
     }
 
     /// Run a rendering pipeline on given frame
-    pub fn run(&mut self, frame: &mut Frame, window: &Window) {
+    pub fn run(&mut self, frame: &mut Frame, window: &Window, debug_info: DebugInformation) {
         self.unpack.queue(self.world.drain_commands());
 
         self.unpack.dispatch(&self.world, frame);
@@ -158,5 +167,10 @@ impl Render {
             frame,
         );
         self.present.dispatch(frame, &self.out_texture);
+        self.debug.render(DebugDispatch {
+            frame,
+            window,
+            debug: debug_info,
+        });
     }
 }

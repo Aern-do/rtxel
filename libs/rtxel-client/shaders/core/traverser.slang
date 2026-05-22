@@ -51,8 +51,8 @@ public struct Traverser {
     public StructuredBuffer<Map4> map4Buffer;
     public StructuredBuffer<Map2> map2Buffer;
 
-    void traverseBrick<let N : uint>(Ray ray, MapVolume<N> map,
-                                     inout VoxelHitInfo result) {
+    void traverseMap<let N : uint>(Ray ray, MapVolume<N> map,
+                                   inout VoxelHitInfo result) {
         ray.origin += ray.direction * (map.config().size.x / N) * 1e-3;
         var dda = DDA(map.config(), ray, int(N * N * N));
         int3 pos;
@@ -92,18 +92,18 @@ public struct Traverser {
             switch (lod) {
             case Lod.Map8: {
                 var map = Map8Volume(hit.voxelAABB, map8Buffer[cell.ptr]);
-                traverseBrick<8>(ray, map, result);
+                traverseMap<8>(ray, map, result);
                 break;
             }
             case Lod.Map4: {
                 var map = Map4Volume(hit.voxelAABB, map4Buffer[cell.ptr]);
-                traverseBrick<4>(ray, map, result);
+                traverseMap<4>(ray, map, result);
 
                 break;
             }
             case Lod.Map2: {
                 var map = Map2Volume(hit.voxelAABB, map2Buffer[cell.ptr]);
-                traverseBrick<2>(ray, map, result);
+                traverseMap<2>(ray, map, result);
                 break;
             }
             }
