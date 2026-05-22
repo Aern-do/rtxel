@@ -43,6 +43,21 @@ pub trait Map {
         self.mask().iter().all(|&w| w == 0)
     }
 
+    /// Returns the highest Y coordinate that contains voxel
+    fn max_height_y(&self) -> u32 {
+        for y in (0..Self::SIZE).rev() {
+            for z in 0..Self::SIZE {
+                for x in 0..Self::SIZE {
+                    if self.get(uvec3(x, y, z)) {
+                        return y + 1;
+                    }
+                }
+            }
+        }
+
+        0
+    }
+
     fn downsample<M: Map + Default>(&self) -> M {
         assert_eq!(
             M::SIZE * 2,

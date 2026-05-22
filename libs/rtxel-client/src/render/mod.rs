@@ -11,7 +11,7 @@ pub mod unpack;
 use bytemuck::{NoUninit, bytes_of};
 pub use compile::{Compiler, compile, compile_into_shader_module};
 pub use frame::{FailedFrame, Frame};
-use glam::{UVec3, Vec3};
+use glam::{UVec3, UVec4, Vec3};
 pub use gpu_world::{GPUMap2, GPUMap4, GPUMap8, GPUWorld};
 pub use present::Present;
 use rtxel_gpu::Ctx;
@@ -38,6 +38,7 @@ use crate::{
 pub struct RenderData {
     pub grid_size: UVec3,
     pub frame: u32,
+    pub enable: UVec4,
 }
 
 pub struct Render {
@@ -65,6 +66,7 @@ impl Render {
             &[RenderData {
                 grid_size: world.grid_size().as_uvec3(),
                 frame: 0,
+                enable: UVec4::default(),
             }],
             Some("Render Data Buffer"),
             BufferUsages::UNIFORM | BufferUsages::COPY_DST,
@@ -135,7 +137,7 @@ impl Render {
     }
 
     /// Update render data buffer
-    pub fn update_render_data(&mut self, world: &World) {
+    pub fn update_render_data(&mut self, world: &World, enable: bool) {
         self.frame += 1;
         self.ctx.queue.write_buffer(
             &self.render_data_buffer,
@@ -143,6 +145,7 @@ impl Render {
             bytes_of(&RenderData {
                 frame: self.frame,
                 grid_size: world.grid_size().as_uvec3(),
+                enable: UVec4::new(enable as u32, 0, 0, 0),
             }),
         );
     }

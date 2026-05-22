@@ -63,7 +63,14 @@ impl GPUWorld {
 
                 self.pending.insert(
                     grid,
-                    Command::set(grid, map, map8.mask, map4.mask, map2.mask),
+                    Command::set(
+                        grid,
+                        map,
+                        map8.max_height_y(),
+                        map8.mask,
+                        map4.mask,
+                        map2.mask,
+                    ),
                 );
             }
             Edit::Clear { grid } => {

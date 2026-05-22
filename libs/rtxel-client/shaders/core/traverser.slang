@@ -71,6 +71,7 @@ public struct Traverser {
         }
     }
 
+    [mutating]
     public VoxelHitInfo traverse(Ray ray) {
         var result = VoxelHitInfo();
         var gridConfig = gridVolume.config();
@@ -84,6 +85,13 @@ public struct Traverser {
                 continue;
 
             var hit = gridDDA.hit();
+
+            float topY = (float)(hit.voxelAABB.min_.y + cell.height);
+            float entryY = hit.hitInfo.entry(ray).y;
+            float exitY = hit.hitInfo.exit(ray).y;
+            if (min(entryY, exitY) > topY) {
+                continue;
+            }
 
             var brickCenter = (hit.voxelAABB.min_ + hit.voxelAABB.max_) * 0.5;
             var dist = length(brickCenter - camera.origin);

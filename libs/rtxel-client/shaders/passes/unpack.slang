@@ -6,6 +6,7 @@ struct Command {
     Action action;
     uint grid;
     uint map;
+    uint height;
 
     Map2 map2;
     Map4 map4;
@@ -37,7 +38,7 @@ void main(uint3 threadId: SV_DispatchThreadID) {
 
     Command cmd = bindings.commandBuffer[threadId.x];
     if (cmd.action == Action.Set) {
-        bindings.gridBuffer[cmd.grid] = GridCell.map(cmd.map);
+        bindings.gridBuffer[cmd.grid] = GridCell.map(cmd.map, cmd.height);
         bindings.map8Buffer[cmd.map] = cmd.map8;
         bindings.map4Buffer[cmd.map] = cmd.map4;
         bindings.map2Buffer[cmd.map] = cmd.map2;

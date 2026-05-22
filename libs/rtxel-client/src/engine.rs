@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use glam::{USizeVec3, Vec3};
-use log::warn;
+use log::{info, warn};
 use rtxel_gpu::Ctx;
 use winit::{
     event::{DeviceEvent, ElementState, WindowEvent},
@@ -29,6 +29,7 @@ pub struct Engine {
     pub last_frame: Instant,
     pub dt: f32,
     pub camera_preset: usize,
+    pub enable: bool,
 }
 
 impl Engine {
@@ -66,6 +67,7 @@ impl Engine {
             last_frame: Instant::now(),
             dt: 0.0,
             camera_preset: 0,
+            enable: false,
         }
     }
 
@@ -121,7 +123,7 @@ impl Engine {
         self.render.apply_edits(self.world.drain_edits());
         self.render.update_debug_info(debug_info);
         self.render.update_camera(&self.camera);
-        self.render.update_render_data(&self.world);
+        self.render.update_render_data(&self.world, self.enable);
 
         if self.keyboard.just_pressed(KeyCode::KeyP) {
             let (origin, yaw, pitch) = Self::CAMERA_PRESETS[self.camera_preset];
@@ -132,6 +134,12 @@ impl Engine {
             self.camera.frame = 0;
             self.camera_preset = (self.camera_preset + 1) % Self::CAMERA_PRESETS.len();
         }
+
+        if self.keyboard.just_pressed(KeyCode::KeyO) {
+            info!("enabled debug");
+            self.enable = !self.enable;
+        }
+
         self.keyboard.clear();
     }
 

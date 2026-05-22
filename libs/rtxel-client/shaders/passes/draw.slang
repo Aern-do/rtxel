@@ -9,6 +9,7 @@ import core.rng;
 struct RenderData {
     uint3 gridSize;
     uint frame;
+    uint4 enable;
 }
 
 struct DrawGroup {
@@ -38,8 +39,7 @@ void main(uint3 threadId: SV_DispatchThreadID) {
 
     var uv = (float2(threadId.xy) + 0.5) / float2(width, height);
     var ray = camera.createRay(uv);
-
-    var gridVolume = GridVolume(renderData.gridSize, bindings.gridBuffer);
+     var gridVolume = GridVolume(renderData.gridSize, bindings.gridBuffer);
     var traverser = Traverser(camera, gridVolume, bindings.map8Buffer,
                               bindings.map4Buffer, bindings.map2Buffer);
 

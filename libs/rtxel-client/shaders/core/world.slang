@@ -15,16 +15,19 @@ public typealias Map2 = Map<2>;
 public struct GridCell {
     uint raw;
     __init(uint value) { raw = value; }
-
     public static GridCell unloaded() { return GridCell(0); }
     public static GridCell empty() { return GridCell(1); }
-    public static GridCell map(uint ptr) { return GridCell(ptr + 2); }
-
-    public bool isUnloaded() { return raw == 0; }
-    public bool isEmpty() { return raw == 1; }
-    public bool isMap() { return raw >= 2; }
+    public static GridCell map(uint ptr, uint height) {
+        return GridCell((height << 28) | (ptr + 2));
+    }
+    public bool isUnloaded() { return (raw & 0x0FFFFFFF) == 0; }
+    public bool isEmpty() { return (raw & 0x0FFFFFFF) == 1; }
+    public bool isMap() { return (raw & 0x0FFFFFFF) >= 2; }
 
     public property uint ptr {
-        get { return raw - 2; }
+        get { return (raw & 0x0FFFFFFF) - 2; }
+    }
+    public property uint height {
+        get { return raw >> 28; }
     }
 }
