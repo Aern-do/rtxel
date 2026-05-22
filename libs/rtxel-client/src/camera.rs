@@ -4,17 +4,20 @@ use winit::keyboard::KeyCode;
 
 use crate::Keyboard;
 
+// probably better move it into diff structure
+// cpu doesn't need to care about padding's for GPU and other shit
 #[derive(Debug, Clone, Copy, NoUninit)]
 #[repr(C)]
 pub struct Camera {
     pub origin: Vec3,
     pub yaw: f32,
-    pub pitch: f32,
-
     pub forward: Vec3,
+    pub pitch: f32,
     pub up: Vec3,
     pub aspect: f32,
     pub fov: f32,
+    pub frame: u32,
+    pub _pad: [f32; 2],
 }
 
 impl Camera {
@@ -27,6 +30,8 @@ impl Camera {
             up: Vec3::Y,
             aspect,
             fov: 90.0,
+            frame: 0,
+            _pad: [0.; 2],
         }
     }
 
@@ -39,23 +44,28 @@ impl Camera {
         self.pitch = self.pitch.clamp(-89.9, 89.9);
 
         self.update_vectors();
+        self.frame = 0;
     }
 
     pub fn update_keyboard(&mut self, keyboard: &Keyboard, dt: f32) {
-        const SENSITIVITY: f32 = 45.0;
+        const SENSITIVITY: f32 = 512.0;
         let (forward, right, _) = self.vectors();
 
         if keyboard.is_pressed(KeyCode::KeyW) {
             self.origin += forward * dt * SENSITIVITY;
+            self.frame = 0;
         }
         if keyboard.is_pressed(KeyCode::KeyS) {
             self.origin -= forward * dt * SENSITIVITY;
+            self.frame = 0;
         }
         if keyboard.is_pressed(KeyCode::KeyD) {
             self.origin += right * dt * SENSITIVITY;
+            self.frame = 0;
         }
         if keyboard.is_pressed(KeyCode::KeyA) {
             self.origin -= right * dt * SENSITIVITY;
+            self.frame = 0;
         }
     }
 

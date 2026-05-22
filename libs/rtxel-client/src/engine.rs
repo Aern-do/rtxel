@@ -7,7 +7,7 @@ use winit::{
     event::{DeviceEvent, ElementState, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::{Window, WindowAttributes},
+    window::{CursorGrabMode, Window, WindowAttributes},
 };
 
 use crate::{
@@ -41,11 +41,13 @@ impl Engine {
             size.height,
         )));
 
-        let mut world = World::new(USizeVec3::splat(8));
-        generate(&mut world);
+        let mut world = World::new(USizeVec3::new(128, 128, 128));
 
         let camera = Camera::new(size.width as f32 / size.height as f32);
-        let render = Render::new(&world, camera, ctx.clone());
+        let render = Render::new(&world, camera, &window, ctx.clone());
+
+        generate(&mut world);
+        world.emit_all_edits();
 
         Self {
             window,
@@ -67,7 +69,7 @@ impl Engine {
         };
 
         self.tick();
-        self.render.run(&mut frame);
+        self.render.run(&mut frame, &self.window);
 
         self.window.pre_present_notify();
         frame.present(&self.ctx);
@@ -95,14 +97,19 @@ impl Engine {
     }
 
     fn tick(&mut self) {
+        self.window
+            .set_cursor_grab(CursorGrabMode::Locked)
+            .expect("failed to lock mouse");
         let now = Instant::now();
         self.dt = now.duration_since(self.last_frame).as_secs_f32();
         self.last_frame = now;
 
+        self.camera.frame += 1;
         self.camera.update_keyboard(&self.keyboard, self.dt);
 
         self.render.apply_edits(self.world.drain_edits());
         self.render.update_camera(&self.camera);
+        self.render.update_render_data(&self.world);
         self.keyboard.clear();
     }
 

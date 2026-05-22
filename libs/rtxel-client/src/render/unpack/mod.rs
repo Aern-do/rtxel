@@ -57,7 +57,8 @@ pub struct Unpack {
 
 impl Unpack {
     /// Maximum amount of unpack commands that can be dispatched in 1 frame
-    pub const DISPATCH_SIZE: usize = 128;
+    pub const DISPATCH_SIZE: usize = 2048;
+    pub const WORKGROUP_SIZE: usize = 256;
 
     /// Creates an unpack pass
     pub fn create(ctx: Arc<Ctx>, compiler: &Compiler) -> Self {
@@ -153,6 +154,6 @@ impl Unpack {
 
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(64, 1, 1);
+        pass.dispatch_workgroups(dispatch_size.div_ceil(Self::WORKGROUP_SIZE) as u32, 1, 1);
     }
 }

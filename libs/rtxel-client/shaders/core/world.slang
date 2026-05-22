@@ -5,7 +5,7 @@ public struct Map<let N : uint> {
 
     public typealias Mask = Array<uint, WORDS>;
 
-    Mask mask;
+    public Mask mask;
 }
 
 public typealias Map8 = Map<8>;
@@ -20,11 +20,11 @@ public struct GridCell {
     public static GridCell empty() { return GridCell(1); }
     public static GridCell map(uint ptr) { return GridCell(ptr + 2); }
 
-    bool isUnloaded() { return raw == 0; }
-    bool isEmpty() { return raw == 1; }
-    bool isMap() { return raw >= 2; }
+    public bool isUnloaded() { return raw == 0; }
+    public bool isEmpty() { return raw == 1; }
+    public bool isMap() { return raw >= 2; }
 
-    property uint ptr {
+    public property uint ptr {
         get { return raw - 2; }
     }
 }

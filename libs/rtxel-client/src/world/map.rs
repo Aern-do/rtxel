@@ -10,22 +10,32 @@ pub trait Map {
     fn mask(&self) -> &[u32];
     fn mask_mut(&mut self) -> &mut [u32];
 
+    /// Returns a index of a word in a mask for given index
+    fn word(idx: usize) -> usize {
+        idx / 32
+    }
+
+    /// Return a bitmask for a given index in a word
+    fn bit(idx: usize) -> u32 {
+        1 << (idx % 32)
+    }
+
     /// Get a voxel at given local map position
     fn get(&self, pos: UVec3) -> bool {
         let idx = flatten(pos.as_usizevec3(), USizeVec3::splat(Self::SIZE as usize));
-        self.mask()[idx / 32] & (1 << (idx % 32)) != 0
+        self.mask()[Self::word(idx)] & (Self::bit(idx)) != 0
     }
 
     /// Set a voxel at given local map position
     fn set(&mut self, pos: UVec3) {
         let idx = flatten(pos.as_usizevec3(), USizeVec3::splat(Self::SIZE as usize));
-        self.mask_mut()[idx / 32] |= 1 << (idx % 32);
+        self.mask_mut()[Self::word(idx)] |= Self::bit(idx);
     }
 
     /// Clear a voxel at given local map position
     fn clear(&mut self, pos: UVec3) {
         let idx = flatten(pos.as_usizevec3(), USizeVec3::splat(Self::SIZE as usize));
-        self.mask_mut()[idx / 32] &= !(1 << (idx % 32));
+        self.mask_mut()[Self::word(idx)] &= !(Self::bit(idx));
     }
 
     /// Check if map is completely empty

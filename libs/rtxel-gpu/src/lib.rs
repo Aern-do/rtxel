@@ -1,6 +1,7 @@
 pub mod bind_group;
 pub mod binding;
 pub mod compute_pipeline;
+pub mod render_pipeline;
 use std::{
     env,
     sync::{RwLock, RwLockReadGuard},
@@ -12,12 +13,14 @@ use bytemuck::{NoUninit, checked::cast_slice};
 pub use compute_pipeline::{BaseComputePipeline, ComputePipelineBuilder};
 use log::info;
 use wgpu::{
-    BackendOptions, Backends, Buffer, BufferUsages, Device, Instance, InstanceDescriptor,
+    BackendOptions, Backends, Buffer, BufferUsages, Device, Features, Instance, InstanceDescriptor,
     InstanceFlags, Limits, MemoryBudgetThresholds, PowerPreference, PresentMode, Queue,
     RequestAdapterOptionsBase, Surface, SurfaceConfiguration, SurfaceTarget, Trace,
     util::{BufferInitDescriptor, DeviceExt},
     wgt::{BufferDescriptor, DeviceDescriptor},
 };
+
+use crate::render_pipeline::{BasePipeline, RenderPipelineBuilder};
 
 #[derive(Debug)]
 pub struct Ctx {
@@ -57,7 +60,11 @@ impl Ctx {
                 trace: trace_path
                     .map(|path| Trace::Directory(path.into()))
                     .unwrap_or_default(),
-                required_limits: Limits::defaults(),
+                required_limits: Limits {
+                    max_buffer_size: 4096 * 1024 * 1024,
+                    max_storage_buffer_binding_size: 4294967292,
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .await
@@ -129,5 +136,12 @@ impl Ctx {
         base: BaseComputePipeline<'pl>,
     ) -> ComputePipelineBuilder<'ctx, 'pl> {
         ComputePipelineBuilder::new(base, self)
+    }
+
+    pub fn render_pipeline<'ctx, 'pl>(
+        &'ctx self,
+        base: BasePipeline<'pl>,
+    ) -> RenderPipelineBuilder<'ctx, 'pl> {
+        RenderPipelineBuilder::new(base, self)
     }
 }

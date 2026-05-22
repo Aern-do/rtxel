@@ -27,8 +27,6 @@ pub struct GPUWorld {
 }
 
 impl GPUWorld {
-    const MAP_BUFFER_SIZE: usize = 1000;
-
     pub fn new(ctx: &Ctx, world: &World) -> Self {
         let grid_buffer = ctx.create_buffer::<u32>(
             world.grid_volume(),
@@ -36,16 +34,16 @@ impl GPUWorld {
             BufferUsages::STORAGE,
         );
 
-        let map8_buffer = Self::create_map_buffer::<GPUMap8>(ctx);
-        let map4_buffer = Self::create_map_buffer::<GPUMap4>(ctx);
-        let map2_buffer = Self::create_map_buffer::<GPUMap2>(ctx);
+        let map8_buffer = Self::create_map_buffer::<GPUMap8>(ctx, &world);
+        let map4_buffer = Self::create_map_buffer::<GPUMap4>(ctx, &world);
+        let map2_buffer = Self::create_map_buffer::<GPUMap2>(ctx, &world);
 
         Self {
             grid_buffer,
             map8_buffer,
             map4_buffer,
             map2_buffer,
-            allocator: SlotAllocator::with_capacity(Self::MAP_BUFFER_SIZE),
+            allocator: SlotAllocator::with_capacity(world.grid_volume()),
 
             pending: HashMap::default(),
             grid_to_map: HashMap::default(),
@@ -94,9 +92,9 @@ impl GPUWorld {
         };
     }
 
-    fn create_map_buffer<T: NoUninit>(ctx: &Ctx) -> Buffer {
+    fn create_map_buffer<T: NoUninit>(ctx: &Ctx, world: &World) -> Buffer {
         ctx.create_buffer::<T>(
-            Self::MAP_BUFFER_SIZE,
+            world.grid_volume(),
             Some("Map Buffer"),
             BufferUsages::STORAGE,
         )

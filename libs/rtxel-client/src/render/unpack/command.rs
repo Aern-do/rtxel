@@ -9,9 +9,9 @@ pub struct Command {
     action: u32,
     grid: u32,
     map: u32,
-    mask8: [u32; Map8::WORDS],
-    mask4: [u32; Map4::WORDS],
     mask2: [u32; Map2::WORDS],
+    mask4: [u32; Map4::WORDS],
+    mask8: [u32; Map8::WORDS],
 }
 
 impl Command {

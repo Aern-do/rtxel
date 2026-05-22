@@ -29,7 +29,7 @@ struct UnpackGroup {
 ParameterBlock<UnpackGroup> bindings;
 
 [shader("compute")]
-[numthreads(64, 1, 1)]
+[numthreads(256, 1, 1)]
 void main(uint3 threadId: SV_DispatchThreadID) {
     uint size = bindings.commandSizeBuffer.value;
     if (threadId.x >= size)

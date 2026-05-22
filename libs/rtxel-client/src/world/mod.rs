@@ -47,7 +47,6 @@ impl World {
         let brick_pos = pos.div_euclid(size);
         let local_pos = pos.rem_euclid(size).as_uvec3();
 
-        let grid = self.grid.idx(brick_pos);
         let map8 = self.grid.map_mut(brick_pos);
 
         if state {
@@ -55,17 +54,22 @@ impl World {
         } else {
             map8.clear(local_pos);
         }
+    }
 
-        // no idea why it can't infer it itself
-        let map4 = map8.downsample::<Map4>();
-        let map2 = map4.downsample();
-
-        self.pending_edits.push(Edit::Set {
-            grid,
-            map8: *map8,
-            map4,
-            map2,
-        });
+    pub fn emit_all_edits(&mut self) {
+        for (idx, map8) in self.grid.grid.iter().enumerate() {
+            if map8.is_empty() {
+                continue;
+            }
+            let map4 = map8.downsample::<Map4>();
+            let map2 = map4.downsample();
+            self.pending_edits.push(Edit::Set {
+                grid: idx,
+                map8: *map8,
+                map4,
+                map2,
+            });
+        }
     }
 
     /// Drain pending edits
